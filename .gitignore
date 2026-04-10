@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+.air/
+*.jsc
+
+# Enterprise packages (commercial, not open source)
+packages/shield/
+packages/hive/

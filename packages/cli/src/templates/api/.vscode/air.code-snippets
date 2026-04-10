@@ -1,0 +1,178 @@
+{
+  // ═══════════════════════════════════════════
+  //  air — MCP Server Development Snippets
+  // ═══════════════════════════════════════════
+
+  "air: defineServer": {
+    "prefix": "airserver",
+    "description": "Create a new MCP server with air",
+    "body": [
+      "import { defineServer, defineTool } from '@air/core';",
+      "",
+      "export default defineServer({",
+      "  name: '${1:my-server}',",
+      "  version: '${2:0.1.0}',",
+      "  description: '${3:MCP server description}',",
+      "",
+      "  shield: {",
+      "    enabled: ${4|true,false|},",
+      "    threatDetection: true,",
+      "  },",
+      "",
+      "  meter: {",
+      "    enabled: true,",
+      "    classify: true,",
+      "    trackCalls: true,",
+      "  },",
+      "",
+      "  tools: [",
+      "    $0",
+      "  ],",
+      "});"
+    ]
+  },
+
+  "air: defineTool": {
+    "prefix": "airtool",
+    "description": "Define a new MCP tool",
+    "body": [
+      "defineTool('${1:tool_name}', {",
+      "  description: '${2:Tool description}',",
+      "  params: {",
+      "    ${3:param}: { type: '${4|string,number,boolean,object|}', description: '${5:param description}' },",
+      "  },",
+      "  handler: async ({ ${3:param} }) => {",
+      "    $0",
+      "    return '${6:result}';",
+      "  },",
+      "}),"
+    ]
+  },
+
+  "air: defineTool (no params)": {
+    "prefix": "airtool0",
+    "description": "Define a tool with no parameters",
+    "body": [
+      "defineTool('${1:tool_name}', {",
+      "  description: '${2:Tool description}',",
+      "  params: {},",
+      "  handler: async () => {",
+      "    $0",
+      "    return '${3:result}';",
+      "  },",
+      "}),"
+    ]
+  },
+
+  "air: defineTool (multi params)": {
+    "prefix": "airtoolm",
+    "description": "Define a tool with multiple parameters",
+    "body": [
+      "defineTool('${1:tool_name}', {",
+      "  description: '${2:Tool description}',",
+      "  params: {",
+      "    ${3:param1}: { type: 'string', description: '${4:first param}' },",
+      "    ${5:param2}: { type: 'string', description: '${6:second param}' },",
+      "  },",
+      "  handler: async ({ ${3:param1}, ${5:param2} }) => {",
+      "    $0",
+      "    return '${7:result}';",
+      "  },",
+      "}),"
+    ]
+  },
+
+  "air: defineResource": {
+    "prefix": "airresource",
+    "description": "Define an MCP resource",
+    "body": [
+      "defineResource({",
+      "  name: '${1:resource_name}',",
+      "  uri: '${2:resource://path}',",
+      "  description: '${3:Resource description}',",
+      "  handler: async (uri, ctx) => {",
+      "    $0",
+      "    return '${4:content}';",
+      "  },",
+      "}),"
+    ]
+  },
+
+  "air: definePrompt": {
+    "prefix": "airprompt",
+    "description": "Define an MCP prompt template",
+    "body": [
+      "definePrompt({",
+      "  name: '${1:prompt_name}',",
+      "  description: '${2:Prompt description}',",
+      "  args: [",
+      "    { name: '${3:arg}', description: '${4:arg description}' },",
+      "  ],",
+      "  handler: async ({ ${3:arg} }) => [",
+      "    { role: 'user', content: `${5:prompt text \\${${3:arg}\\}}` },",
+      "  ],",
+      "}),"
+    ]
+  },
+
+  "air: shield config": {
+    "prefix": "airshield",
+    "description": "Add shield (security) configuration",
+    "body": [
+      "shield: {",
+      "  enabled: true,",
+      "  policies: [",
+      "    { name: '${1:policy_name}', target: '${2:*}', action: '${3|allow,deny|}', priority: ${4:10} },",
+      "  ],",
+      "  threatDetection: true,",
+      "  rateLimit: {",
+      "    maxCalls: ${5:100},",
+      "    windowMs: ${6:60000},",
+      "  },",
+      "  audit: true,",
+      "},"
+    ]
+  },
+
+  "air: meter config": {
+    "prefix": "airmeter",
+    "description": "Add meter (metrics) configuration",
+    "body": [
+      "meter: {",
+      "  enabled: true,",
+      "  classify: true,",
+      "  trackCalls: true,",
+      "},"
+    ]
+  },
+
+  "air: import core": {
+    "prefix": "airimport",
+    "description": "Import air/core essentials",
+    "body": [
+      "import { defineServer, defineTool${1:, getAuditLog, getMetricsSnapshot} } from '@air/core';"
+    ]
+  },
+
+  "air: import all": {
+    "prefix": "airimportall",
+    "description": "Import from all air packages",
+    "body": [
+      "import { defineServer, defineTool, getAuditLog, getMetricsSnapshot } from '@air/core';",
+      "import { AirLogger, PrettyFormatter, ConsoleTransport } from '@air/logger';",
+      "import { PolicyEngine, ThreatDetector, RateLimiter } from '@air/shield';",
+      "import { LayerClassifier, CallTracker } from '@air/meter';"
+    ]
+  },
+
+  "air: handler async": {
+    "prefix": "airhandler",
+    "description": "Async handler function for a tool",
+    "body": [
+      "handler: async ({ ${1:params} }) => {",
+      "  $0",
+      "  return '${2:result}';",
+      "},"
+    ]
+  }
+}

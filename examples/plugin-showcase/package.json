@@ -1,0 +1,14 @@
+{
+  "name": "plugin-showcase",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "air 플러그인 쇼케이스 — 19개 빌트인 플러그인 활용 예제",
+  "scripts": {
+    "dev": "npx tsx src/index.ts",
+    "test": "npx tsx src/test.ts"
+  },
+  "dependencies": {
+    "@airmcp-dev/core": "^0.1.0",
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  }
+}

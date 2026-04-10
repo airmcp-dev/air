@@ -1,0 +1,21 @@
+{
+  "name": "memo-server",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "air dev",
+    "start": "air start",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@airmcp-dev/core": "^0.1.0",
+    "@airmcp-dev/logger": "^0.1.0",
+    "@airmcp-dev/shield": "^0.1.0",
+    "@airmcp-dev/meter": "^0.1.0",
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}
