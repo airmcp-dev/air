@@ -1,0 +1,39 @@
+name: Plugin Request
+description: Suggest a new built-in plugin
+title: "[Plugin] "
+labels: ["plugin"]
+body:
+  - type: input
+    id: plugin-name
+    attributes:
+      label: Plugin Name
+      placeholder: "rateLimitByIpPlugin, oauthPlugin, etc."
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - Security
+        - Performance
+        - Monitoring
+        - Data
+        - Network
+        - Dev/Test
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What should this plugin do?
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Usage Example
+      description: How would developers use this plugin?
+      render: typescript
