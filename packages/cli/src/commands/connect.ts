@@ -1,14 +1,14 @@
 // air CLI — commands/connect.ts
 //
-// air connect <client> [--name <name>] [--transport stdio|http|sse] [--port <port>]
+// airmcp-dev connect <client> [--name <name>] [--transport stdio|http|sse] [--port <port>]
 //
 // MCP 클라이언트의 설정 파일에 현재 서버를 자동 등록한다.
 // path-resolver로 OS별 경로를 해석하고, json-editor로 안전하게 수정.
 //
 // @example
-//   air connect claude-desktop
-//   air connect cursor --name my-db-tool
-//   air connect vscode --transport http --port 3100
+//   airmcp-dev connect claude-desktop
+//   airmcp-dev connect cursor --name my-db-tool
+//   airmcp-dev connect vscode --transport http --port 3100
 
 import { Command } from 'commander';
 import { resolve } from 'node:path';
@@ -144,10 +144,10 @@ export const connectCommand = new Command('connect')
       printer.info('The client will start the server automatically via stdio.');
     } else if (opts.proxy) {
       printer.info('The proxy will bridge stdio (client) ↔ SSE (server).');
-      printer.info(`Make sure the server is running: air start --transport sse --port ${opts.port}`);
+      printer.info(`Make sure the server is running: airmcp-dev start --transport sse --port ${opts.port}`);
     } else {
       printer.info(
-        `Make sure the server is running: air start --transport ${opts.transport} --port ${opts.port}`,
+        `Make sure the server is running: airmcp-dev start --transport ${opts.transport} --port ${opts.port}`,
       );
     }
     printer.blank();

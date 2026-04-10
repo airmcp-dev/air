@@ -181,17 +181,17 @@ McpErrors.timeout(tool, ms)        // -32003
 ## CLI 명령
 
 ```
-air create <이름> [--template basic|crud|api|agent] [--lang ko|en]
-air add <타입> <이름> [--params "key:type,..."]
-air dev [--console] [-p port] [-t stdio|sse|http]
-air start [-p port] [-t transport] [--foreground]
-air stop [이름]
-air status
-air list [--json]
-air inspect <도구>
-air connect <클라이언트> [-t transport] [-p port] [-H host] [--proxy path]
-air disconnect <클라이언트>
-air check
+airmcp-dev create <이름> [--template basic|crud|api|agent] [--lang ko|en]
+airmcp-dev add <타입> <이름> [--params "key:type,..."]
+airmcp-dev dev [--console] [-p port] [-t stdio|sse|http]
+airmcp-dev start [-p port] [-t transport] [--foreground]
+airmcp-dev stop [이름]
+airmcp-dev status
+airmcp-dev list [--json]
+airmcp-dev inspect <도구>
+airmcp-dev connect <클라이언트> [-t transport] [-p port] [-H host] [--proxy path]
+airmcp-dev disconnect <클라이언트>
+airmcp-dev check
 ```
 
 지원 클라이언트: claude-desktop, claude-code, cursor, vscode, chatgpt, ollama, vllm, lm-studio

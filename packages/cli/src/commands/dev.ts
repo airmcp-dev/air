@@ -1,6 +1,6 @@
 // air CLI — commands/dev.ts
 //
-// air dev [--port <port>] [--transport stdio|http|sse]
+// airmcp-dev dev [--port <port>] [--transport stdio|http|sse]
 //
 // 개발 모드로 MCP 서버를 실행한다.
 // - 소스 변경 감지 → 자동 재시작 (fs.watch)
@@ -8,9 +8,9 @@
 // - 종료 시 graceful shutdown
 //
 // @example
-//   air dev
-//   air dev --port 3100
-//   air dev --transport http
+//   airmcp-dev dev
+//   airmcp-dev dev --port 3100
+//   airmcp-dev dev --transport http
 
 import { Command } from 'commander';
 import { spawn, type ChildProcess } from 'node:child_process';

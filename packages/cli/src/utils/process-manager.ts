@@ -1,7 +1,7 @@
 // air CLI — utils/process-manager.ts
 //
 // MCP 서버 프로세스의 PID를 추적한다.
-// air start → PID 기록, air stop → PID로 종료, air status → 살아있는지 확인.
+// airmcp-dev start → PID 기록, air stop → PID로 종료, air status → 살아있는지 확인.
 //
 // PID 파일 위치: <project>/.air/pids/<server-name>.pid
 // .air/ 디렉토리는 .gitignore 대상.

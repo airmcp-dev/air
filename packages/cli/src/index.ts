@@ -5,10 +5,10 @@
 // 로직 없음. 등록 + 실행만.
 //
 // @example
-//   npx air create my-tool
-//   air dev --port 3000
-//   air start
-//   air connect claude-desktop
+//   npx @airmcp-dev/cli create my-tool
+//   airmcp-dev dev --port 3000
+//   airmcp-dev start
+//   airmcp-dev connect claude-desktop
 
 import { Command } from 'commander';
 import { readFileSync } from 'node:fs';

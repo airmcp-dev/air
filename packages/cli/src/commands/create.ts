@@ -1,14 +1,14 @@
 // air CLI — commands/create.ts
 //
-// air create <name> [--template basic|crud|api|agent] [--lang en|ko]
+// airmcp-dev create <name> [--template basic|crud|api|agent] [--lang en|ko]
 //
 // 새 MCP 서버 프로젝트를 스캐폴딩한다.
 // 언어를 선택하면 해당 언어의 템플릿(주석/설명)이 적용된다.
 //
 // @example
-//   npx air create my-tool
-//   npx air create my-tool --lang ko
-//   npx air create db-server --template crud --lang en
+//   npx @airmcp-dev/cli create my-tool
+//   npx @airmcp-dev/cli create my-tool --lang ko
+//   npx @airmcp-dev/cli create db-server --template crud --lang en
 
 import { Command } from 'commander';
 import { cp, readFile, writeFile, access } from 'node:fs/promises';
@@ -161,6 +161,6 @@ export const createCommand = new Command('create')
     printer.blank();
     console.log(`  cd ${name}`);
     console.log('  npm install');
-    console.log('  air dev');
+    console.log('  airmcp-dev dev');
     printer.blank();
   });

@@ -7,10 +7,10 @@ air is a TypeScript framework for building Model Context Protocol (MCP) servers.
 ## Quick Start
 
 ```bash
-npx air create my-server
+npx @airmcp-dev/cli create my-server
 cd my-server
 npm install
-npx air dev --console -p 3510
+npx @airmcp-dev/cli dev --console -p 3510
 ```
 
 ## Define a Server
@@ -94,17 +94,17 @@ MCP error codes (-32000 to -32003, -32601 to -32603).
 ## CLI
 
 ```
-air create <name>              Create a new MCP server project
-air add tool <name>            Add tool/resource/prompt scaffold
-air dev [--console]            Dev mode with hot reload + test console
-air start                      Production mode (background)
-air stop                       Stop server
-air status                     Show status
-air list                       List tools/resources/prompts
-air inspect <tool>             Inspect tool schema
-air connect <client>           Register with Claude Desktop, Cursor, etc.
-air disconnect <client>        Unregister
-air check                      Diagnose project health
+airmcp-dev create <name>              Create a new MCP server project
+airmcp-dev add tool <name>            Add tool/resource/prompt scaffold
+airmcp-dev dev [--console]            Dev mode with hot reload + test console
+airmcp-dev start                      Production mode (background)
+airmcp-dev stop                       Stop server
+airmcp-dev status                     Show status
+airmcp-dev list                       List tools/resources/prompts
+airmcp-dev inspect <tool>             Inspect tool schema
+airmcp-dev connect <client>           Register with Claude Desktop, Cursor, etc.
+airmcp-dev disconnect <client>        Unregister
+airmcp-dev check                      Diagnose project health
 ```
 
 ## Transport

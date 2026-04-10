@@ -1,6 +1,6 @@
 {
   "name": "@airmcp-dev/logger",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Structured logging for MCP servers — JSON, pretty, file, remote transport",
   "type": "module",
   "files": ["dist", "README.md", "LICENSE"],
@@ -15,7 +15,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@airmcp-dev/core": "^0.1.1"
+    "@airmcp-dev/core": "^0.1.2"
   },
   "devDependencies": {
     "typescript": "^5.5.0",

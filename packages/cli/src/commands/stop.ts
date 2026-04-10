@@ -1,6 +1,6 @@
 // air CLI — commands/stop.ts
 //
-// air stop [name]
+// airmcp-dev stop [name]
 //
 // 실행 중인 MCP 서버를 종료한다.
 // - PID 파일 기반으로 SIGTERM → SIGKILL

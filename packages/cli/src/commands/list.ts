@@ -1,6 +1,6 @@
 // air CLI — commands/list.ts
 //
-// air list
+// airmcp-dev list
 //
 // 현재 프로젝트의 MCP 서버에 등록된 도구/리소스/프롬프트 목록을 출력한다.
 // 소스 파일을 동적 import해서 defineServer()가 반환한 정보를 읽는다.

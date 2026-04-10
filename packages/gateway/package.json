@@ -1,6 +1,6 @@
 {
   "name": "@airmcp-dev/gateway",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP reverse proxy, server registry, and request router",
   "type": "module",
   "files": ["dist", "README.md", "LICENSE"],
@@ -16,7 +16,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@airmcp-dev/core": "^0.1.1",
+    "@airmcp-dev/core": "^0.1.2",
     "@modelcontextprotocol/sdk": "^1.12.0"
   },
   "devDependencies": {

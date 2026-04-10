@@ -1,7 +1,7 @@
 // air CLI — utils/test-console.ts
 //
 // 내장 인터랙티브 테스트 콘솔.
-// air dev 실행 시 서버에 MCP 클라이언트로 연결하여
+// airmcp-dev dev 실행 시 서버에 MCP 클라이언트로 연결하여
 // 도구를 직접 호출하고 결과를 확인할 수 있다.
 //
 // 명령어:
@@ -66,7 +66,7 @@ export async function startTestConsole(options: TestConsoleOptions): Promise<voi
     return false;
   }
 
-  console.log('\n  \x1b[36mair dev console\x1b[0m — type "help" for commands\n');
+  console.log('\n  \x1b[36mairmcp-dev dev console\x1b[0m — type "help" for commands\n');
   console.log('  Connecting to server...');
 
   const connected = await connect();

@@ -1,6 +1,6 @@
 {
   "name": "my-mcp-server",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "private": true,
   "scripts": {
@@ -9,7 +9,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@airmcp-dev/core": "^0.1.1"
+    "@airmcp-dev/core": "^0.1.2"
   },
   "devDependencies": {
     "typescript": "^5.5.0"

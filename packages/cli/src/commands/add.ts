@@ -1,15 +1,15 @@
 // air CLI — commands/add.ts
 //
-// air add <type> <name>
+// airmcp-dev add <type> <name>
 //
 // 현재 프로젝트의 src/index.ts에 도구/리소스/프롬프트 scaffold를 추가한다.
 // VS Code 스니펫과 달리 에디터에 종속되지 않는다.
 //
 // @example
-//   air add tool search
-//   air add tool search --params "query:string,limit:number"
-//   air add resource config
-//   air add prompt summarize
+//   airmcp-dev add tool search
+//   airmcp-dev add tool search --params "query:string,limit:number"
+//   airmcp-dev add resource config
+//   airmcp-dev add prompt summarize
 
 import { Command } from 'commander';
 import { resolve } from 'node:path';

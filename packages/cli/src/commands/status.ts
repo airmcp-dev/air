@@ -1,6 +1,6 @@
 // air CLI — commands/status.ts
 //
-// air status
+// airmcp-dev status
 //
 // 현재 프로젝트의 MCP 서버 상태를 보여준다.
 // - 프로세스 실행 여부 (PID, alive)

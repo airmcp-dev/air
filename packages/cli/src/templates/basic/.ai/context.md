@@ -14,9 +14,9 @@ This project is an MCP server built with the air framework.
 - definePrompt(name, { args, handler })
 
 ## Adding Features
-- Add tool: `air add tool <name> --params "key:type"`
-- Add resource: `air add resource <name>`
-- Add prompt: `air add prompt <name>`
+- Add tool: `airmcp-dev add tool <name> --params "key:type"`
+- Add resource: `airmcp-dev add resource <name>`
+- Add prompt: `airmcp-dev add prompt <name>`
 
 ## Plugins (import from @airmcp-dev/core)
 timeoutPlugin, retryPlugin, circuitBreakerPlugin, fallbackPlugin,
@@ -31,6 +31,6 @@ jsonLoggerPlugin, perUserRateLimitPlugin, dryrunPlugin
 - http: for Streamable HTTP
 
 ## Commands
-- `air dev --console` -- dev mode with test console
-- `air connect claude-desktop` -- register with client
-- `air check` -- project diagnostics
+- `airmcp-dev dev --console` -- dev mode with test console
+- `airmcp-dev connect claude-desktop` -- register with client
+- `airmcp-dev check` -- project diagnostics

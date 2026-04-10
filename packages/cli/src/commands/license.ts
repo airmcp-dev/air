@@ -1,8 +1,8 @@
 // air CLI — commands/license.ts
 //
-// air license --machine-id     머신 ID 출력 (라이선스 발급 시 필요)
-// air license --status         현재 라이선스 상태 확인
-// air license --activate <f>   라이선스 파일 활성화
+// airmcp-dev license --machine-id     머신 ID 출력 (라이선스 발급 시 필요)
+// airmcp-dev license --status         현재 라이선스 상태 확인
+// airmcp-dev license --activate <f>   라이선스 파일 활성화
 
 import { Command } from 'commander';
 import { createHash } from 'node:crypto';
@@ -110,8 +110,8 @@ export const licenseCommand = new Command('license')
     // 기본: help
     printer.info('Usage:');
     printer.blank();
-    printer.info('  air license --machine-id     Show machine ID');
-    printer.info('  air license --status         Show license status');
-    printer.info('  air license --activate <f>   Activate from file');
+    printer.info('  airmcp-dev license --machine-id     Show machine ID');
+    printer.info('  airmcp-dev license --status         Show license status');
+    printer.info('  airmcp-dev license --activate <f>   Activate from file');
     printer.blank();
   });

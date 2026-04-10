@@ -1,6 +1,6 @@
 // air CLI — commands/inspect.ts
 //
-// air inspect <tool>
+// airmcp-dev inspect <tool>
 //
 // 특정 도구의 상세 스키마를 출력한다.
 // - 파라미터 이름, 타입, 설명, 필수 여부

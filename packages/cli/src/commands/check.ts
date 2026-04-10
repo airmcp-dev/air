@@ -1,6 +1,6 @@
 // air CLI — commands/check.ts
 //
-// air check
+// airmcp-dev check
 //
 // 프로젝트 상태를 종합 진단한다.
 // - 환경: Node.js, TypeScript, pnpm 버전
@@ -11,8 +11,8 @@
 // - 도구: 등록된 도구 수
 //
 // @example
-//   air check
-//   air check --fix    (향후: 자동 수정)
+//   airmcp-dev check
+//   airmcp-dev check --fix    (향후: 자동 수정)
 
 import { Command } from 'commander';
 import { resolve } from 'node:path';
@@ -62,7 +62,7 @@ export const checkCommand = new Command('check')
     const results: CheckResult[] = [];
 
     printer.blank();
-    printer.heading('air check');
+    printer.heading('airmcp-dev check');
 
     // ── 1. 환경 ──
     const nodeVersion = run('node --version', cwd);

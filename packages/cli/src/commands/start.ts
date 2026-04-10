@@ -1,6 +1,6 @@
 // air CLI — commands/start.ts
 //
-// air start [--port <port>] [--transport stdio|http|sse]
+// airmcp-dev start [--port <port>] [--transport stdio|http|sse]
 //
 // MCP 서버를 프로덕션 모드로 백그라운드 실행한다.
 // - 빌드된 JS(dist/)를 node로 실행
@@ -8,8 +8,8 @@
 // - 이미 실행 중이면 중복 방지
 //
 // @example
-//   air start
-//   air start --port 3100 --transport http
+//   airmcp-dev start
+//   airmcp-dev start --port 3100 --transport http
 
 import { Command } from 'commander';
 import { spawn } from 'node:child_process';
@@ -33,7 +33,7 @@ async function findProductionEntry(cwd: string): Promise<string> {
   }
 
   throw new Error(
-    'No built entry found. Run "npm run build" first, or use "air dev" for development.',
+    'No built entry found. Run "npm run build" first, or use "airmcp-dev dev" for development.',
   );
 }
 
@@ -61,7 +61,7 @@ export const startCommand = new Command('start')
     // ── 1. 중복 실행 확인 ──
     if (await ProcessManager.isRunning(name, cwd)) {
       printer.warn(`Server "${name}" is already running.`);
-      printer.info('Use "air stop" to stop it first, or "air status" to check.');
+      printer.info('Use "airmcp-dev stop" to stop it first, or "airmcp-dev status" to check.');
       process.exit(1);
     }
 
@@ -140,6 +140,6 @@ export const startCommand = new Command('start')
     await ProcessManager.save(name, child.pid, cwd);
 
     printer.success(`Server "${name}" started (PID: ${child.pid})`);
-    printer.info('Use "air status" to check, "air stop" to stop.');
+    printer.info('Use "airmcp-dev status" to check, "airmcp-dev stop" to stop.');
     printer.blank();
   });

@@ -1,6 +1,6 @@
 // air CLI — commands/disconnect.ts
 //
-// air disconnect <client> [--name <n>]
+// airmcp-dev disconnect <client> [--name <n>]
 //
 // MCP 클라이언트의 설정 파일에서 서버 등록을 제거한다.
 //
