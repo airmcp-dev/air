@@ -12,42 +12,23 @@ AI 코딩 어시스턴트에게 air 프레임워크를 알려주는 컨텍스트
 
 **Claude Code — 프로젝트에 파일 추가:**
 
-```bash
-curl -o CLAUDE.md https://raw.githubusercontent.com/airmcp-dev/air/main/CONTEXT.md
-```
-
-Claude Code는 프로젝트 루트의 `CLAUDE.md` 파일을 자동으로 읽습니다.
+아래 내용을 복사하여 프로젝트 루트에 `CLAUDE.md`로 저장합니다. Claude Code는 이 파일을 자동으로 읽습니다.
 
 ### Cursor
 
-프로젝트 루트에 `.cursorrules` 파일로 저장합니다:
-
-```bash
-curl -o .cursorrules https://raw.githubusercontent.com/airmcp-dev/air/main/CONTEXT.md
-```
-
-Cursor는 `.cursorrules` 파일을 자동으로 컨텍스트에 포함합니다.
+아래 내용을 복사하여 프로젝트 루트에 `.cursorrules`로 저장합니다. Cursor는 이 파일을 자동으로 컨텍스트에 포함합니다.
 
 ### GitHub Copilot
 
-`.github/copilot-instructions.md`에 저장합니다:
-
-```bash
-mkdir -p .github
-curl -o .github/copilot-instructions.md https://raw.githubusercontent.com/airmcp-dev/air/main/CONTEXT.md
-```
+아래 내용을 복사하여 `.github/copilot-instructions.md`로 저장합니다.
 
 ### 기타 AI 어시스턴트
 
 Windsurf, Cline, Aider 등 대부분의 AI 코딩 도구에서 사용할 수 있습니다. 각 도구의 컨텍스트 파일 규칙에 맞게 저장하거나, 대화 시작 시 첫 메시지에 내용을 붙여넣으세요.
 
-## 다운로드
-
-[GitHub에서 다운로드 →](https://raw.githubusercontent.com/airmcp-dev/air/main/CONTEXT.md)
-
 ## 컨텍스트 문서 내용
 
-아래는 AI에게 제공할 전체 내용입니다. AI 컨텍스트는 호환성을 위해 영문으로 작성되어 있습니다.
+아래 내용을 복사하여 사용하세요. AI 컨텍스트는 호환성을 위해 영문으로 작성되어 있습니다.
 
 ::: details 전체 내용 보기 (클릭하여 펼치기)
 

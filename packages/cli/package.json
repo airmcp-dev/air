@@ -7,10 +7,13 @@
     "airmcp-dev": "./dist/index.js"
   },
   "main": "dist/index.js",
-  "files": [
-    "dist",
-    "templates"
-  ],
+  "files": ["dist", "templates", "README.md", "LICENSE"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc && rm -rf dist/templates && cp -r src/templates dist/templates",
     "dev": "tsc --watch",
@@ -36,17 +39,20 @@
     "cli",
     "model-context-protocol",
     "ai",
-    "tool-server"
+    "agent",
+    "tool-server",
+    "claude",
+    "cursor"
   ],
   "author": "CodePedia Labs",
-  "homepage": "https://airmcp.dev",
-  "bugs": { "url": "https://github.com/airmcp-dev/air/issues" },
-  "repository": { "type": "git", "url": "https://github.com/airmcp-dev/air", "directory": "packages/cli" },
-  "keywords": ["mcp", "ai", "agent", "air"],
   "license": "Apache-2.0",
+  "homepage": "https://docs.airmcp.dev",
   "repository": {
     "type": "git",
     "url": "https://github.com/airmcp-dev/air",
     "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/airmcp-dev/air/issues"
   }
 }

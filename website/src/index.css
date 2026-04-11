@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* -- The Jamsil Font -- */
+@font-face { font-family: 'TheJamsil'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2302_01@1.0/TheJamsil1Thin.woff2') format('woff2'); font-weight: 100; font-display: swap; }
+@font-face { font-family: 'TheJamsil'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2302_01@1.0/TheJamsil2Light.woff2') format('woff2'); font-weight: 300; font-display: swap; }
+@font-face { font-family: 'TheJamsil'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2302_01@1.0/TheJamsil3Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'TheJamsil'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2302_01@1.0/TheJamsil4Medium.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'TheJamsil'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2302_01@1.0/TheJamsil5Bold.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'TheJamsil'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2302_01@1.0/TheJamsil6ExtraBold.woff2') format('woff2'); font-weight: 800; font-display: swap; }
+
+@layer base {
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  ::selection { background: rgba(0, 212, 170, 0.25); color: #f0f0f5; }
+  html { scroll-behavior: smooth; scroll-padding-top: 5rem; overflow-x: hidden; }
+  body {
+    font-family: 'TheJamsil', system-ui, -apple-system, sans-serif;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    background: #08080d;
+    overflow-x: hidden;
+    min-width: 0;
+  }
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: #00d4aa; }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl;
+  }
+  .glass-card-hover {
+    @apply glass-card transition-all duration-500 
+           hover:border-air-500/25 hover:bg-white/[0.05]
+           hover:shadow-[0_8px_40px_-12px_rgba(0,212,170,0.15)];
+  }
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-air-400 via-air-300 to-emerald-300;
+  }
+  .section-container {
+    @apply max-w-6xl mx-auto px-5 sm:px-8 lg:px-10;
+  }
+  .nav-link {
+    @apply text-text-secondary hover:text-text-primary transition-all duration-300 text-sm font-medium
+           relative after:absolute after:bottom-[-2px] after:left-0 after:w-0 after:h-[1.5px] 
+           after:bg-air-500 after:transition-all after:duration-300 hover:after:w-full;
+  }
+  .nav-link-active {
+    @apply text-air-400 after:w-full;
+  }
+  .btn-primary {
+    @apply inline-flex items-center gap-2.5 px-7 py-3 bg-air-500 text-surface-0 font-bold
+           rounded-xl transition-all duration-300 hover:bg-air-400 
+           hover:shadow-[0_4px_24px_-4px_rgba(0,212,170,0.4)]
+           active:scale-[0.97] text-sm tracking-wide;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center gap-2.5 px-7 py-3 border border-white/10 text-text-primary
+           font-medium rounded-xl transition-all duration-300 
+           hover:border-air-500/30 hover:bg-white/[0.04]
+           active:scale-[0.97] text-sm;
+  }
+  .code-block {
+    @apply bg-[#0c0c14] border border-white/[0.06] rounded-xl font-mono text-sm overflow-x-auto;
+  }
+  .icon-box {
+    @apply w-11 h-11 flex items-center justify-center rounded-xl 
+           bg-air-500/10 text-air-400 text-base
+           transition-all duration-300;
+  }
+  .icon-box-hover {
+    @apply group-hover:bg-air-500/20 group-hover:text-air-300 
+           group-hover:shadow-[0_0_20px_-4px_rgba(0,212,170,0.2)];
+  }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .perspective-1000 { perspective: 1000px; }
+  .preserve-3d { transform-style: preserve-3d; }
+  .backface-hidden { backface-visibility: hidden; }
+}

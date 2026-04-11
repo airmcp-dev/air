@@ -142,8 +142,7 @@ server.state.db = myConnection;
 Register cleanup functions for SIGTERM/SIGINT. Multiple allowed, run in order. One failure doesn't stop the rest.
 
 ```typescript
-import { onShutdown, clearShutdownHandlers } from '@airmcp-dev/core';
+import { onShutdown } from '@airmcp-dev/core';
 
 onShutdown(async () => { await db.close(); });
-clearShutdownHandlers();  // Remove all handlers
 ```

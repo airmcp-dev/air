@@ -1,0 +1,4 @@
+/docs       https://docs.airmcp.dev              301
+/docs/*     https://docs.airmcp.dev/:splat       301
+/community  https://github.com/airmcp-dev/air/discussions  301
+/*          /index.html   200

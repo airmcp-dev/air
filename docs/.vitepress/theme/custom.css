@@ -1,3 +1,19 @@
+/* ── Inter를 잠실체로 재정의 (VitePress 프리로드 경고 방지) ── */
+@font-face {
+  font-family: 'Inter';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2302_01@1.0/TheJamsil3Regular.woff2') format('woff2');
+  font-weight: 100 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2302_01@1.0/TheJamsil5Bold.woff2') format('woff2');
+  font-weight: 500 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ── 잠실체 (TheJamsil) ── */
 @font-face {
   font-family: 'TheJamsil';

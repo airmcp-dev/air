@@ -152,7 +152,7 @@ handler: async (params, context) => context.state.db.query(params.sql)
 SIGTERM/SIGINT 수신 시 실행할 정리 함수. 여러 개 등록 가능, 등록 순서대로 실행. 하나가 실패해도 나머지 계속 실행.
 
 ```typescript
-import { onShutdown, clearShutdownHandlers } from '@airmcp-dev/core';
+import { onShutdown } from '@airmcp-dev/core';
 
 onShutdown(async () => {
   await db.close();
@@ -162,9 +162,6 @@ onShutdown(async () => {
 onShutdown(async () => {
   await cache.flush();
 });
-
-// 모든 핸들러 제거
-clearShutdownHandlers();
 ```
 
 시그널 수신 시:

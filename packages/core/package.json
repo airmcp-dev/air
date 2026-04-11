@@ -3,13 +3,40 @@
   "version": "0.1.3",
   "author": "CodePedia Labs",
   "license": "Apache-2.0",
-  "description": "MCP server framework — defineServer, defineTool, middleware, transport",
+  "description": "MCP server framework — defineServer, defineTool, 19 plugins, storage, transport",
   "type": "module",
   "files": ["dist", "README.md", "LICENSE"],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "homepage": "https://docs.airmcp.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/airmcp-dev/air",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/airmcp-dev/air/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "agent",
+    "tool-server",
+    "claude",
+    "cursor",
+    "typescript",
+    "framework",
+    "plugins"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
