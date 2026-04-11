@@ -1,6 +1,6 @@
 {
   "name": "@airmcp-dev/core",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "author": "CodePedia Labs",
   "license": "Apache-2.0",
   "description": "MCP server framework — defineServer, defineTool, 19 plugins, storage, transport",
@@ -37,6 +37,11 @@
   ],
   "engines": {
     "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
