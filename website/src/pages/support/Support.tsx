@@ -7,6 +7,54 @@ const FAQ_KEYS = Array.from({ length: 10 }, (_, i) => i + 1);
 
 const RELEASES = [
   {
+    version: 'v0.1.5',
+    date: '2026-04-12',
+    type: 'patch' as const,
+    changes: {
+      en: [
+        'Fixed FileStore append performance: O(n²) → O(1) using appendFile',
+        'Shield state isolation: rate limits and audit logs are now per-server instance',
+        'Fixed SSE mode not registering resources/prompts to session servers',
+        'retryPlugin: complete internal retry loop with proper server state passthrough',
+        'MiddlewareChain: after middleware now runs on abort (logging/metrics guaranteed)',
+        'queuePlugin: fixed setTimeout leak on release',
+        'Replaced SDK type workarounds with official McpServer.resource() API',
+        'Removed 5 unsafe "as any" casts across core and gateway packages',
+        'Added 34 new tests (165 → 199): CLI, middleware edge cases, plugin combos',
+      ],
+      ko: [
+        'FileStore append 성능 수정: O(n²) → O(1) appendFile 사용',
+        'Shield 상태 격리: 레이트 리밋/감사 로그가 서버 인스턴스별 독립',
+        'SSE 모드에서 리소스/프롬프트가 세션 서버에 등록되지 않던 버그 수정',
+        'retryPlugin: 내부 재시도 루프 완결 + 서버 state 전달',
+        '미들웨어 체인: abort 시에도 after 미들웨어 실행 (로깅/메트릭 보장)',
+        'queuePlugin: release 시 setTimeout 누적 방지',
+        'SDK 타입 우회를 공식 McpServer.resource() API로 전환',
+        'core/gateway에서 unsafe "as any" 캐스트 5곳 제거',
+        '테스트 34개 추가 (165 → 199): CLI, 미들웨어 엣지케이스, 플러그인 조합',
+      ],
+    },
+  },
+  {
+    version: 'v0.1.4',
+    date: '2026-04-11',
+    type: 'patch' as const,
+    changes: {
+      en: [
+        'Added README.md to all 5 npm packages (previously blank on npmjs.com)',
+        'Fixed package exports: ./src/index.ts → dist paths for proper npm usage',
+        'Added homepage, repository, bugs, keywords, engines to core package.json',
+        'Cleaned up duplicate fields in CLI package.json',
+      ],
+      ko: [
+        '5개 npm 패키지에 README.md 추가 (이전에는 npmjs.com에서 빈 페이지)',
+        '패키지 exports 수정: ./src/index.ts → dist 경로로 npm 사용자 호환',
+        'core package.json에 homepage, repository, bugs, keywords, engines 추가',
+        'CLI package.json 중복 필드 정리',
+      ],
+    },
+  },
+  {
     version: 'v0.1.3',
     date: '2025-04-10',
     type: 'patch' as const,
