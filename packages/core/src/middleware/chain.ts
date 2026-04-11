@@ -24,7 +24,9 @@ export class MiddlewareChain {
       requestId: toolCtx.requestId,
       serverName: toolCtx.serverName,
       startedAt: toolCtx.startedAt,
-      meta: {},
+      meta: {
+        _serverState: toolCtx.state,
+      },
     };
 
     // ── before 미들웨어 ──
@@ -33,9 +35,19 @@ export class MiddlewareChain {
       try {
         const result = await mw.before(ctx);
         if (result?.abort) {
-          return result.abortResponse
+          const abortResult = result.abortResponse
             ? normalizeResult(result.abortResponse)
             : normalizeResult('Request aborted by middleware');
+
+          // abort 시에도 after 미들웨어를 실행 (로깅/메트릭 수집 보장)
+          const duration = Date.now() - ctx.startedAt;
+          const afterCtx = { ...ctx, result: abortResult, duration };
+          for (const afterMw of this.middlewares) {
+            if (!afterMw.after) continue;
+            try { await afterMw.after(afterCtx); } catch { /* after 에러 무시 */ }
+          }
+
+          return abortResult;
         }
         if (result?.params) ctx.params = result.params;
         if (result?.meta) Object.assign(ctx.meta, result.meta);

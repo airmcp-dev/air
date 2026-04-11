@@ -31,33 +31,37 @@ export function retryPlugin(options?: RetryOptions): AirPlugin {
     onError: async (ctx, error) => {
       if (!retryOn(error)) return undefined;
 
-      const retryCount = (ctx.meta._retryCount || 0) as number;
-      if (retryCount >= maxRetries) return undefined; // 재시도 초과
+      const startCount = (ctx.meta._retryCount || 0) as number;
+      if (startCount >= maxRetries) return undefined; // 이미 재시도 초과
 
-      ctx.meta._retryCount = retryCount + 1;
-      const delay = baseDelay * Math.pow(2, retryCount);
+      // 내부 루프로 재시도를 완결 — 체인 재순회에 의존하지 않음
+      let lastError: Error = error;
+      for (let attempt = startCount; attempt < maxRetries; attempt++) {
+        ctx.meta._retryCount = attempt + 1;
+        const delay = baseDelay * Math.pow(2, attempt);
 
-      console.warn(
-        `[air:retry] ${ctx.tool.name} failed (attempt ${retryCount + 1}/${maxRetries}), retrying in ${delay}ms...`,
-      );
+        console.warn(
+          `[air:retry] ${ctx.tool.name} failed (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms...`,
+        );
 
-      await new Promise((r) => setTimeout(r, delay));
+        await new Promise((r) => setTimeout(r, delay));
 
-      // 핸들러 재실행
-      try {
-        const result = await ctx.tool.handler(ctx.params, {
-          requestId: ctx.requestId,
-          serverName: ctx.serverName,
-          startedAt: ctx.startedAt,
-          state: {},
-        });
-        return result;
-      } catch (retryError) {
-        if (ctx.meta._retryCount < maxRetries) {
-          return undefined; // 다음 onError 미들웨어에서 다시 시도
+        try {
+          const result = await ctx.tool.handler(ctx.params, {
+            requestId: ctx.requestId,
+            serverName: ctx.serverName,
+            startedAt: ctx.startedAt,
+            state: ctx.meta._serverState || {},
+          });
+          return result; // 성공 시 즉시 반환
+        } catch (retryError) {
+          lastError = retryError as Error;
+          if (!retryOn(lastError)) return undefined; // 재시도 대상 아닌 에러
         }
-        return undefined;
       }
+
+      // 모든 재시도 실패 — 에러 처리를 다음 onError 핸들러에 위임
+      return undefined;
     },
   };
 

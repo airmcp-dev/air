@@ -3,7 +3,7 @@
 // 등록된 서버들의 헬스체크를 주기적으로 수행한다.
 // 응답 없는 서버는 status를 'error'로 전환.
 
-import type { ServerEntry, HealthCheckResult } from '../types.js';
+import type { ServerEntry, HttpConnection, HealthCheckResult } from '../types.js';
 import { ServerRegistry } from './server-registry.js';
 
 export class HealthChecker {
@@ -77,12 +77,12 @@ export class HealthChecker {
       }
 
       // http/sse 서버는 URL로 health 체크
-      const url = (server.connection as any).url;
+      const conn = server.connection as HttpConnection;
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
 
       try {
-        const res = await fetch(`${url}/health`, {
+        const res = await fetch(`${conn.url}/health`, {
           signal: controller.signal,
         });
         clearTimeout(timeout);

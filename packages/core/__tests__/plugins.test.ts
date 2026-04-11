@@ -54,17 +54,17 @@ describe('retryPlugin', () => {
         },
       },
       params: {},
-      meta: { _retryCount: 0 },
+      meta: { _retryCount: 0, _serverState: {} },
       requestId: 'r1',
       serverName: 's1',
       startedAt: Date.now(),
     } as any;
 
-    // onError에서 재시도 — 성공하면 결과 반환, 실패하면 undefined
+    // onError에서 재시도 — 내부 루프로 maxRetries까지 시도
     const result = await mw.onError!(ctx, new Error('fail'));
     // retry 플러그인이 handler를 재호출하므로 callCount가 증가
     expect(callCount).toBeGreaterThanOrEqual(1);
-    expect(ctx.meta._retryCount).toBe(1);
+    expect(result).toBe('success');
   });
 });
 

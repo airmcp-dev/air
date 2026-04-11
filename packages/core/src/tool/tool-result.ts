@@ -33,8 +33,11 @@ export function normalizeResult(result: AirToolResponse): McpContent[] {
 
   // { image: "base64...", mimeType: "..." } → image content
   if ('image' in result && typeof result.image === 'string') {
+    const mimeType = 'mimeType' in result && typeof result.mimeType === 'string'
+      ? result.mimeType
+      : 'image/png';
     return [
-      { type: 'image', data: result.image, mimeType: (result as any).mimeType || 'image/png' },
+      { type: 'image', data: result.image, mimeType },
     ];
   }
 

@@ -69,6 +69,9 @@ export interface AirConfig {
   /** Transport 설정 (기본: auto-detect) */
   transport?: TransportConfig;
 
+  /** SSE 최대 동시 세션 수 (기본: 200, 초과 시 503) */
+  maxSseSessions?: number;
+
   /** 스토리지 설정 (기본: memory) */
   storage?: StoreOptions;
 

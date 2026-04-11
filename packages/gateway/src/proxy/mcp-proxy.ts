@@ -4,7 +4,7 @@
 // 클라이언트의 도구 호출을 받아서 적절한 하위 서버로 전달하고 결과를 반환.
 // ServerRegistry + ToolIndex + RequestRouter + SessionPool을 조합.
 
-import type { GatewayConfig, ServerConnection, ToolEntry } from '../types.js';
+import type { GatewayConfig, ServerConnection, HttpConnection, ToolEntry } from '../types.js';
 import { ServerRegistry } from '../registry/server-registry.js';
 import { ToolIndex } from '../registry/tool-index.js';
 import { HealthChecker } from '../registry/health-checker.js';
@@ -92,12 +92,12 @@ export class McpProxy {
 
       // transport에 따라 실행 (여기서는 HTTP 예시)
       if (server.connection.type === 'http' || server.connection.type === 'sse') {
-        const url = (server.connection as any).url;
+        const conn = server.connection as HttpConnection;
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), this.config.requestTimeout);
 
         try {
-          const res = await fetch(url, {
+          const res = await fetch(conn.url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(request.jsonrpc),
@@ -113,8 +113,12 @@ export class McpProxy {
         }
       }
 
-      // stdio는 프로세스에 stdin/stdout으로 통신 (향후 구현)
-      throw new Error(`stdio proxy not yet implemented for server "${server.id}"`);
+      // stdio 서버는 Gateway 프록시 미지원 — SSE/HTTP 사용 권장
+      throw new Error(
+        `[Gateway] stdio proxy is not supported. Server "${server.id}" uses stdio transport. ` +
+        `Please configure the server with SSE or HTTP transport instead. ` +
+        `Example: transport: { type: 'sse', port: 3510 }`
+      );
     } finally {
       this.sessionPool.release(session.id);
     }

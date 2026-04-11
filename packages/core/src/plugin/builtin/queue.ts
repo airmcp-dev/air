@@ -27,6 +27,7 @@ interface QueueEntry {
   resolve: () => void;
   reject: (err: Error) => void;
   addedAt: number;
+  timer: ReturnType<typeof setTimeout>;
 }
 
 export function queuePlugin(options?: QueueOptions): AirPlugin {
@@ -61,12 +62,12 @@ export function queuePlugin(options?: QueueOptions): AirPlugin {
     }
 
     return new Promise<void>((resolve, reject) => {
-      const entry: QueueEntry = { resolve, reject, addedAt: Date.now() };
+      const entry: QueueEntry = { resolve, reject, addedAt: Date.now(), timer: null as any };
       queue.push(entry);
       queues.set(toolName, queue);
 
-      // 타임아웃
-      setTimeout(() => {
+      // 타임아웃 — 정상 resolve 시 clearTimeout으로 정리됨
+      entry.timer = setTimeout(() => {
         const idx = queue.indexOf(entry);
         if (idx >= 0) {
           queue.splice(idx, 1);
@@ -82,8 +83,9 @@ export function queuePlugin(options?: QueueOptions): AirPlugin {
 
     const queue = queues.get(toolName);
     if (queue && queue.length > 0) {
-      // 대기 중인 요청을 깨움
+      // 대기 중인 요청을 깨움 — 타이머 정리
       const next = queue.shift()!;
+      clearTimeout(next.timer);
       next.resolve();
     } else {
       active.set(toolName, current - 1);

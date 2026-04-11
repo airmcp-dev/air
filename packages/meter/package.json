@@ -1,6 +1,6 @@
 {
   "name": "@airmcp-dev/meter",
-  "version": "0.1.3",
+  "version": "0.1.5",
   "description": "MCP performance metering — 7-Layer classification, token cost tracking, metrics export",
   "type": "module",
   "files": ["dist", "README.md", "LICENSE"],
@@ -18,7 +18,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@airmcp-dev/core": "^0.1.3"
+    "@airmcp-dev/core": "^0.1.4"
   },
   "devDependencies": {
     "typescript": "^5.5.0",

@@ -24,6 +24,8 @@ export class ServerRunner {
   private serverCtx: ServerContext;
   private middlewareChain: MiddlewareChain;
   private tools: AirToolDef[] = [];
+  private resources: AirResourceDef[] = [];
+  private prompts: AirPromptDef[] = [];
 
   constructor(config: AirConfig, middlewareChain: MiddlewareChain) {
     this.config = config;
@@ -38,16 +40,34 @@ export class ServerRunner {
   /** 도구 등록 — MCP SDK에 zod 스키마 + 핸들러 래퍼를 연결 */
   registerTool(tool: AirToolDef) {
     this.tools.push(tool);
-    const zodSchema = paramsToZodSchema(tool.params);
+    this.registerToolToServer(this.mcp, tool);
+  }
 
+  /** 리소스 등록 */
+  registerResource(resource: AirResourceDef) {
+    this.resources.push(resource);
+    this.registerResourceToServer(this.mcp, resource);
+  }
+
+  /** 프롬프트 등록 */
+  registerPrompt(prompt: AirPromptDef) {
+    this.prompts.push(prompt);
+    this.registerPromptToServer(this.mcp, prompt);
+  }
+
+  // ── 팩토리 메서드: 임의의 McpServer 인스턴스에 도구/리소스/프롬프트를 등록 ──
+
+  /** 도구를 지정 McpServer에 등록 */
+  private registerToolToServer(server: McpServer, tool: AirToolDef) {
+    const zodSchema = paramsToZodSchema(tool.params);
     if (zodSchema) {
-      this.mcp.tool(tool.name, tool.description || '', zodSchema.shape, async (params: any) => {
+      server.tool(tool.name, tool.description || '', zodSchema.shape, async (params: any) => {
         const reqCtx = createRequestContext(this.config.name, this.serverCtx.state);
         const content = await this.middlewareChain.execute(tool, params || {}, reqCtx);
         return { content } as any;
       });
     } else {
-      this.mcp.tool(tool.name, tool.description || '', async (params: any) => {
+      server.tool(tool.name, tool.description || '', async (params: any) => {
         const reqCtx = createRequestContext(this.config.name, this.serverCtx.state);
         const content = await this.middlewareChain.execute(tool, params || {}, reqCtx);
         return { content } as any;
@@ -55,19 +75,16 @@ export class ServerRunner {
     }
   }
 
-  /** 리소스 등록 */
-  registerResource(resource: AirResourceDef) {
-    const metadata = {
-      description: resource.description,
-      mimeType: resource.mimeType,
-    };
+  /** 리소스를 지정 McpServer에 등록 */
+  private registerResourceToServer(server: McpServer, resource: AirResourceDef) {
+    const metadata: Record<string, any> = {};
+    if (resource.description) metadata.description = resource.description;
+    if (resource.mimeType) metadata.mimeType = resource.mimeType;
 
-    // MCP SDK registerResource(name, uri:string, metadata, callback)
-    // uri는 반드시 string이어야 template 분기를 안 탄다
     const uri = String(resource.uri);
 
     try {
-      (this.mcp as any).registerResource(
+      server.resource(
         resource.name,
         uri,
         metadata,
@@ -84,13 +101,13 @@ export class ServerRunner {
         },
       );
     } catch (err: any) {
-      console.error(`[air] Failed to register resource "${resource.name}" (uri: "${uri}", type: ${typeof uri}): ${err.message}\n${err.stack}`);
+      console.error(`[air] Failed to register resource "${resource.name}" (uri: "${uri}"): ${err.message}\n${err.stack}`);
     }
   }
 
-  /** 프롬프트 등록 */
-  registerPrompt(prompt: AirPromptDef) {
-    this.mcp.prompt(prompt.name, prompt.description || '', async (args: any) => {
+  /** 프롬프트를 지정 McpServer에 등록 */
+  private registerPromptToServer(server: McpServer, prompt: AirPromptDef) {
+    server.prompt(prompt.name, prompt.description || '', async (args: any) => {
       const messages = await prompt.handler(args || {});
       return {
         messages: messages.map((m) => ({
@@ -99,6 +116,19 @@ export class ServerRunner {
         })),
       };
     });
+  }
+
+  /** 모든 도구/리소스/프롬프트를 지정 McpServer에 일괄 등록 (SSE 세션용) */
+  private registerAllToServer(server: McpServer) {
+    for (const tool of this.tools) {
+      this.registerToolToServer(server, tool);
+    }
+    for (const resource of this.resources) {
+      this.registerResourceToServer(server, resource);
+    }
+    for (const prompt of this.prompts) {
+      this.registerPromptToServer(server, prompt);
+    }
   }
 
   /** 서버 시작 — transport 감지 + 연결 */
@@ -160,11 +190,11 @@ export class ServerRunner {
     this.serverCtx.status = 'running';
   }
 
-  /** SSE transport 시작 — GET /sse + POST /message */
-    /** SSE transport 시작 — GET /sse + POST /message, 세션별 독립 McpServer */
+  /** SSE transport 시작 — GET /sse + POST /message, 세션별 독립 McpServer */
   private async startSSE() {
     const { createServer } = await import('http');
     const port = this.config.transport?.port || this.config.dev?.port || 3100;
+    const maxSessions = this.config.maxSseSessions ?? 200;
 
     // 세션별 SSE transport + McpServer를 관리
     const sessions = new Map<string, { transport: SSEServerTransport; server: McpServer }>();
@@ -184,6 +214,13 @@ export class ServerRunner {
 
       // GET /sse — 새 세션 생성 + SSE 연결
       if (req.method === 'GET' && url.pathname === '/sse') {
+        // 세션 수 상한 체크
+        if (sessions.size >= maxSessions) {
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: `Max sessions reached (${maxSessions})` }));
+          return;
+        }
+
         const transport = new SSEServerTransport('/message', res);
         
         // 세션별 새 McpServer 인스턴스 생성
@@ -192,23 +229,8 @@ export class ServerRunner {
           version: this.config.version || '0.1.0',
         });
 
-        // 모든 도구를 세션 서버에 등록
-        for (const tool of this.tools) {
-          const zodSchema = paramsToZodSchema(tool.params);
-          if (zodSchema) {
-            sessionServer.tool(tool.name, tool.description || '', zodSchema.shape, async (params: any) => {
-              const reqCtx = createRequestContext(this.config.name, this.serverCtx.state);
-              const content = await this.middlewareChain.execute(tool, params || {}, reqCtx);
-              return { content } as any;
-            });
-          } else {
-            sessionServer.tool(tool.name, tool.description || '', async (params: any) => {
-              const reqCtx = createRequestContext(this.config.name, this.serverCtx.state);
-              const content = await this.middlewareChain.execute(tool, params || {}, reqCtx);
-              return { content } as any;
-            });
-          }
-        }
+        // 모든 도구/리소스/프롬프트를 세션 서버에 등록
+        this.registerAllToServer(sessionServer);
 
         sessions.set(transport.sessionId, { transport, server: sessionServer });
         console.log(`[air] SSE client connected (session: ${transport.sessionId})`);
@@ -284,7 +306,7 @@ export class ServerRunner {
       state: this.serverCtx.status,
       uptime: this.serverCtx.uptime,
       toolCount: this.tools.length,
-      resourceCount: 0,
+      resourceCount: this.resources.length,
       transport: detectTransport(this.config.transport),
     };
   }

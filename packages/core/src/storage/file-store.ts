@@ -9,7 +9,7 @@
 //     {namespace}.json      — key-value 데이터
 //     {namespace}.log.jsonl — append-only 로그
 
-import { mkdir, readFile, writeFile, unlink } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, appendFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { StorageAdapter, QueryOptions } from '../types/storage.js';
 
@@ -90,13 +90,7 @@ export class FileStore implements StorageAdapter {
   async append(namespace: string, entry: any): Promise<void> {
     const logPath = join(this.basePath, `${namespace}.log.jsonl`);
     const line = JSON.stringify({ ...entry, _ts: Date.now() }) + '\n';
-
-    try {
-      const existing = await readFile(logPath, 'utf-8').catch(() => '');
-      await writeFile(logPath, existing + line, 'utf-8');
-    } catch {
-      await writeFile(logPath, line, 'utf-8');
-    }
+    await appendFile(logPath, line, 'utf-8');
   }
 
   async query(namespace: string, opts?: QueryOptions): Promise<any[]> {

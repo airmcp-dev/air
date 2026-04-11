@@ -36,21 +36,39 @@ function flattenValues(obj: any): string[] {
   return [];
 }
 
-/** 레이트 리밋 윈도우 추적 */
-const rateLimitWindows = new Map<string, number[]>();
+/** 레이트 리밋 윈도우 추적 — @deprecated 하위 호환용, 새 인스턴스는 클로저 내부 사용 */
+const _globalRateLimitWindows = new Map<string, number[]>();
 
-/** 감사 로그 저장소 */
-const auditLog: Array<{
+/** 감사 로그 저장소 — @deprecated 하위 호환용, 새 인스턴스는 클로저 내부 사용 */
+const _globalAuditLog: AuditEntry[] = [];
+
+/** 감사 로그 엔트리 타입 */
+export interface AuditEntry {
   timestamp: string;
   tool: string;
   decision: 'allowed' | 'denied' | 'threat' | 'rate-limited';
   reason?: string;
-}> = [];
+}
+
+/** Shield 미들웨어 — 인스턴스별 상태 접근 인터페이스 */
+export interface ShieldMiddleware extends AirMiddleware {
+  /** 이 인스턴스의 감사 로그 조회 */
+  getAuditLog(): AuditEntry[];
+  /** 이 인스턴스의 감사 로그 초기화 */
+  clearAuditLog(): void;
+  /** 이 인스턴스의 레이트 리밋 윈도우 초기화 */
+  resetRateLimits(): void;
+}
 
 /**
  * ShieldConfig로부터 보안 미들웨어를 생성한다.
+ * 인스턴스별로 rateLimitWindows와 auditLog를 격리한다.
  */
-export function createShieldMiddleware(config: ShieldConfig): AirMiddleware {
+export function createShieldMiddleware(config: ShieldConfig): ShieldMiddleware {
+  // ── 인스턴스별 격리 상태 ──
+  const rateLimitWindows = new Map<string, number[]>();
+  const auditLog: AuditEntry[] = [];
+
   // 정책 규칙을 우선순위 내림차순 정렬
   const policies = (config.policies || [])
     .sort((a, b) => (b.priority || 0) - (a.priority || 0));
@@ -64,6 +82,11 @@ export function createShieldMiddleware(config: ShieldConfig): AirMiddleware {
 
   return {
     name: 'air:shield',
+
+    // ── 인스턴스별 접근 메서드 ──
+    getAuditLog() { return [...auditLog]; },
+    clearAuditLog() { auditLog.length = 0; },
+    resetRateLimits() { rateLimitWindows.clear(); },
 
     before: async (ctx: MiddlewareContext): Promise<MiddlewareResult | void> => {
       const toolName = ctx.tool.name;
@@ -174,12 +197,18 @@ export function createShieldMiddleware(config: ShieldConfig): AirMiddleware {
   };
 }
 
-/** 감사 로그 조회 (외부에서 접근용) */
+/**
+ * 감사 로그 조회 (전역)
+ * @deprecated 멀티 서버 환경에서는 ShieldMiddleware.getAuditLog()를 사용하세요.
+ */
 export function getAuditLog() {
-  return [...auditLog];
+  return [..._globalAuditLog];
 }
 
-/** 감사 로그 초기화 */
+/**
+ * 감사 로그 초기화 (전역)
+ * @deprecated 멀티 서버 환경에서는 ShieldMiddleware.clearAuditLog()를 사용하세요.
+ */
 export function clearAuditLog() {
-  auditLog.length = 0;
+  _globalAuditLog.length = 0;
 }

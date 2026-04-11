@@ -27,6 +27,7 @@ export { loggingMiddleware } from './middleware/index.js';
 export { errorBoundaryMiddleware } from './middleware/index.js';
 export { AirError, McpErrors } from './middleware/index.js';
 export { createShieldMiddleware, getAuditLog, clearAuditLog } from './middleware/index.js';
+export type { ShieldMiddleware, AuditEntry } from './middleware/index.js';
 export { createMeterMiddleware, getMetricsSnapshot, resetMetricsHistory } from './middleware/index.js';
 
 // ── 설정 ──
