@@ -1,18 +1,18 @@
 # air MCP Framework — AI Context Document
 
-> 이 문서는 AI 코딩 어시스턴트(Claude, Cursor, GitHub Copilot 등)에게 제공하기 위한 air 프레임워크 요약입니다.
-> 프로젝트에 이 파일을 포함하면 AI가 air API를 정확하게 사용할 수 있습니다.
+> This document is a concise reference for AI coding assistants (Claude, Cursor, GitHub Copilot, etc.) to accurately use the air framework.
+> Include this file in your project so AI understands air's APIs.
 
-## air란?
+## What is air?
 
-air는 MCP(Model Context Protocol) 서버를 만들기 위한 TypeScript 프레임워크입니다. `@airmcp-dev/core` 하나로 도구, 리소스, 프롬프트를 정의하고, 19개 내장 플러그인으로 재시도/캐시/인증 등을 한 줄로 추가합니다.
+air is a TypeScript framework for building MCP (Model Context Protocol) servers. With `@airmcp-dev/core` alone, you can define tools, resources, and prompts, and add retry/cache/auth with 19 built-in plugins in one line each.
 
-- **패키지**: `@airmcp-dev/core`, `@airmcp-dev/cli`, `@airmcp-dev/gateway`, `@airmcp-dev/logger`, `@airmcp-dev/meter`
-- **런타임**: Node.js 18+, TypeScript ESM
-- **MCP SDK**: 내부적으로 `@modelcontextprotocol/sdk ^1.12.0` 사용
-- **라이선스**: Apache-2.0
+- **Packages**: `@airmcp-dev/core`, `@airmcp-dev/cli`, `@airmcp-dev/gateway`, `@airmcp-dev/logger`, `@airmcp-dev/meter`
+- **Runtime**: Node.js 18+, TypeScript ESM
+- **MCP SDK**: Uses `@modelcontextprotocol/sdk ^1.12.0` internally
+- **License**: Apache-2.0
 
-## 핵심 API
+## Core API
 
 ### defineServer
 
@@ -20,18 +20,18 @@ air는 MCP(Model Context Protocol) 서버를 만들기 위한 TypeScript 프레�
 import { defineServer, defineTool, defineResource, definePrompt } from '@airmcp-dev/core';
 
 const server = defineServer({
-  name: 'my-server',              // 필수
-  version: '1.0.0',               // 기본: '0.1.0'
-  description: '서버 설명',
+  name: 'my-server',              // Required
+  version: '1.0.0',               // Default: '0.1.0'
+  description: 'Server description',
   transport: { type: 'sse', port: 3510 },  // 'stdio' | 'sse' | 'http' | 'auto'
   storage: { type: 'file', path: '.air/data' },  // 'memory' | 'file'
   logging: { level: 'info', format: 'json' },
   meter: { classify: true, trackCalls: true },
-  use: [ /* 플러그인 배열 — 순서 = 실행 순서 */ ],
-  middleware: [ /* 커스텀 미들웨어 */ ],
-  tools: [ /* defineTool 배열 */ ],
-  resources: [ /* defineResource 배열 */ ],
-  prompts: [ /* definePrompt 배열 */ ],
+  use: [ /* Plugin array — order = execution order */ ],
+  middleware: [ /* Custom middleware */ ],
+  tools: [ /* defineTool array */ ],
+  resources: [ /* defineResource array */ ],
+  prompts: [ /* definePrompt array */ ],
 });
 
 server.start();
@@ -41,19 +41,19 @@ server.start();
 
 ```typescript
 defineTool('search', {
-  description: '문서 검색',
+  description: 'Search documents',
   params: {
-    query: 'string',                    // 단축 표기
+    query: 'string',                    // Shorthand
     limit: 'number?',                   // ? = optional
-    email: { type: 'string', description: '이메일', optional: true },  // 객체 표기
-    tags: z.array(z.string()),          // Zod도 가능
+    email: { type: 'string', description: 'Email', optional: true },  // Object form
+    tags: z.array(z.string()),          // Zod also works
   },
-  layer: 4,                             // L1-L7 Meter 힌트 (선택)
+  layer: 4,                             // L1-L7 Meter hint (optional)
   handler: async ({ query, limit }, context) => {
     // context: { requestId, serverName, startedAt, state }
-    // 반환값은 자동으로 MCP content로 변환:
+    // Return value auto-converts to MCP content:
     //   string → text, number/boolean → String, object/array → JSON.stringify
-    //   { text } → text, { image, mimeType } → image, { content: [...] } → 그대로
+    //   { text } → text, { image, mimeType } → image, { content: [...] } → passthrough
     return await doSearch(query, limit);
   },
 });
@@ -78,54 +78,54 @@ defineResource('file:///{path}', {
 
 ```typescript
 definePrompt('summarize', {
-  description: '텍스트 요약',
-  arguments: [{ name: 'text', required: true }],  // 모두 string 타입
+  description: 'Summarize text',
+  arguments: [{ name: 'text', required: true }],  // All string type
   handler: ({ text }) => [
-    { role: 'user', content: `요약해주세요: ${text}` },
+    { role: 'user', content: `Summarize: ${text}` },
   ],
 });
 ```
 
-## 19개 내장 플러그인
+## 19 Built-in Plugins
 
 ```typescript
 import {
-  // 안정성
+  // Stability
   timeoutPlugin,         // timeoutPlugin(30_000) — ms
   retryPlugin,           // retryPlugin({ maxRetries: 3, delayMs: 200, retryOn?: (err) => bool })
   circuitBreakerPlugin,  // circuitBreakerPlugin({ failureThreshold: 5, resetTimeoutMs: 30_000, perTool: true })
-  fallbackPlugin,        // fallbackPlugin({ 'primary_tool': 'backup_tool' }) — 도구명→대체도구 맵
+  fallbackPlugin,        // fallbackPlugin({ 'primary_tool': 'backup_tool' }) — tool name → fallback tool map
 
-  // 성능
+  // Performance
   cachePlugin,           // cachePlugin({ ttlMs: 60_000, maxEntries: 1000, exclude: ['write'] })
   dedupPlugin,           // dedupPlugin({ windowMs: 1000 })
   queuePlugin,           // queuePlugin({ concurrency: { 'db': 3, '*': 10 }, maxQueueSize: 100, queueTimeoutMs: 30_000 })
 
-  // 보안
+  // Security
   authPlugin,            // authPlugin({ type: 'api-key', keys: [process.env.KEY!], publicTools: ['ping'], paramName: '_auth' })
   sanitizerPlugin,       // sanitizerPlugin({ stripHtml: true, stripControl: true, maxStringLength: 10_000, exclude: [] })
   validatorPlugin,       // validatorPlugin({ rules: [{ tool: '*', validate: (p) => errorMsg | undefined }] })
 
-  // 네트워크
+  // Network
   corsPlugin,            // corsPlugin({ origins: ['*'], methods: ['GET','POST','OPTIONS'], credentials: false })
   webhookPlugin,         // webhookPlugin({ url, events: ['tool.call','tool.error','tool.slow'], slowThresholdMs: 5000, batchSize: 1 })
 
-  // 데이터
+  // Data
   transformPlugin,       // transformPlugin({ before: { '*': (p) => p }, after: { 'tool': (r) => r } })
   i18nPlugin,            // i18nPlugin({ defaultLang: 'en', translations: { key: { en: '', ko: '' } }, langParam: '_lang' })
 
-  // 모니터링
+  // Monitoring
   jsonLoggerPlugin,      // jsonLoggerPlugin({ output: 'stderr', logParams: false, extraFields: {} })
   perUserRateLimitPlugin,// perUserRateLimitPlugin({ maxCalls: 10, windowMs: 60_000, identifyBy: '_userId' })
 
-  // 개발
+  // Dev
   dryrunPlugin,          // dryrunPlugin({ enabled: false, perCall: true, mockResponse?: (tool, params) => any })
 } from '@airmcp-dev/core';
 ```
 
-**권장 순서**: `authPlugin → sanitizerPlugin → timeoutPlugin → retryPlugin → cachePlugin → queuePlugin`
+**Recommended order**: `authPlugin → sanitizerPlugin → timeoutPlugin → retryPlugin → cachePlugin → queuePlugin`
 
-## 스토리지
+## Storage
 
 ```typescript
 import { createStorage, MemoryStore, FileStore } from '@airmcp-dev/core';
@@ -133,41 +133,41 @@ import { createStorage, MemoryStore, FileStore } from '@airmcp-dev/core';
 const store = await createStorage({ type: 'file', path: '.air/data' });
 
 // Key-Value
-await store.set('namespace', 'key', value, ttlSeconds?);  // TTL은 초 단위!
+await store.set('namespace', 'key', value, ttlSeconds?);  // TTL in seconds!
 await store.get('namespace', 'key');          // T | null
 await store.delete('namespace', 'key');       // boolean
 await store.list('namespace', 'prefix?');     // string[]
 await store.entries('namespace', 'prefix?');  // { key, value }[]
 
 // Append-Only Log
-await store.append('logs', { action: 'login' });  // 자동 _ts 추가
+await store.append('logs', { action: 'login' });  // Auto-adds _ts
 await store.query('logs', { limit: 100, since?: Date, filter?: { action: 'login' } });
 
-await store.close();  // FileStore: 즉시 flush + 타이머 중지
+await store.close();  // FileStore: immediate flush + stop timer
 ```
 
-## 미들웨어
+## Middleware
 
 ```typescript
 const myMiddleware: AirMiddleware = {
   name: 'my-mw',
   before: async (ctx) => {
     // ctx: { tool, params, requestId, serverName, startedAt, meta }
-    // return undefined → 다음으로
-    // return { params: {...} } → 파라미터 교체
-    // return { abort: true, abortResponse: '...' } → 체인 중단
+    // return undefined → continue
+    // return { params: {...} } → replace params
+    // return { abort: true, abortResponse: '...' } → stop chain
   },
   after: async (ctx) => {
-    // ctx에 추가: result, duration
+    // ctx also has: result, duration
   },
   onError: async (ctx, error) => {
-    // return 값 → 정상 응답으로 전환
-    // return undefined → 다음 에러 핸들러로
+    // return value → convert to normal response
+    // return undefined → pass to next error handler
   },
 };
 ```
 
-## 에러
+## Errors
 
 ```typescript
 import { AirError, McpErrors } from '@airmcp-dev/core';
@@ -202,7 +202,7 @@ npx @airmcp-dev/cli connect cursor --transport sse --port 3510
 npx @airmcp-dev/cli start / stop / status / list / inspect <tool>
 ```
 
-**지원 클라이언트**: claude-desktop, claude-code, cursor, vscode, chatgpt, ollama, vllm, lm-studio
+**Supported clients**: claude-desktop, claude-code, cursor, vscode, chatgpt, ollama, vllm, lm-studio
 
 ## Gateway
 
@@ -224,7 +224,7 @@ gateway.register({
 await gateway.start();
 ```
 
-## 메트릭
+## Metrics
 
 ```typescript
 import { getMetrics, resetMetrics, getMetricsSnapshot, resetMetricsHistory } from '@airmcp-dev/core';
@@ -233,7 +233,7 @@ getMetrics();          // { toolName: { calls, errors, totalDuration, avgDuratio
 getMetricsSnapshot();  // { totalCalls, successRate, avgLatencyMs, layerDistribution, toolCounts }
 ```
 
-## 커스텀 플러그인
+## Custom Plugin
 
 ```typescript
 function myPlugin(options?: MyOptions): AirPlugin {
@@ -250,11 +250,11 @@ function myPlugin(options?: MyOptions): AirPlugin {
 }
 ```
 
-## 주의사항
+## Gotchas
 
-- ESM 프로젝트: `"type": "module"`, import에 `.js` 확장자 필수
-- stdio에서 `console.log()` 사용 금지 → MCP 프로토콜 깨짐. `console.error()` 사용
-- `cachePlugin({ ttlMs })` = 밀리초, `store.set(ns, key, val, ttl)` = 초
-- `authPlugin`의 `_auth` 파라미터는 도구 params에 정의해야 MCP 클라이언트 경유 시 전달됨
-- `fallbackPlugin`은 값이 아니라 도구명→대체도구명 매핑: `{ 'primary': 'backup' }`
-- `queuePlugin`의 `concurrency`는 맵: `{ 'db': 3, '*': 10 }`
+- ESM project: `"type": "module"`, `.js` extension required in imports
+- Never use `console.log()` in stdio mode → breaks MCP protocol. Use `console.error()`
+- `cachePlugin({ ttlMs })` = milliseconds, `store.set(ns, key, val, ttl)` = seconds
+- `authPlugin`'s `_auth` param must be defined in tool params for MCP client passthrough
+- `fallbackPlugin` maps tool names, not values: `{ 'primary': 'backup' }`
+- `queuePlugin`'s `concurrency` is a map: `{ 'db': 3, '*': 10 }`
