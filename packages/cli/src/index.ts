@@ -27,7 +27,9 @@ import {
   disconnectCommand,
   checkCommand,
   licenseCommand,
+  updateCommand,
 } from './commands/index.js';
+import { notifyUpdateIfAvailable } from './commands/update.js';
 
 // ── 버전 읽기 ──
 const __filename = fileURLToPath(import.meta.url);
@@ -55,11 +57,18 @@ program.addCommand(connectCommand);
 program.addCommand(disconnectCommand);
 program.addCommand(checkCommand);
 program.addCommand(licenseCommand);
+program.addCommand(updateCommand);
 
 // ── 기본 동작: 도움말 ──
 program.action(() => {
   program.outputHelp();
 });
+
+// ── 실행 시 업데이트 알림 (help, version, update 제외) ──
+const subCommand = process.argv[2];
+if (subCommand && !['update', '--version', '-v', '--help', '-h'].includes(subCommand)) {
+  notifyUpdateIfAvailable().catch(() => {});
+}
 
 // ── 실행 ──
 program.parse();
