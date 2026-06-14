@@ -20,11 +20,62 @@ const tool = defineTool('search', {
 function defineTool(name: string, options: {
   description?: string;
   params?: AirToolParams;
+  outputSchema?: AirToolParams;       // MCP 2025-06-18 Structured Output
+  annotations?: AirToolAnnotations;   // MCP 2025-03-26 Tool Annotations
   handler: AirToolHandler;
   layer?: number;
   tags?: string[];
 }): AirToolDef;
 ```
+
+## Tool Annotations <Badge text="0.2.0" />
+
+MCP 2025-03-26 spec. Hints for clients about tool behavior. All fields optional.
+
+```typescript
+defineTool('delete_user', {
+  description: 'Delete a user permanently',
+  params: { userId: 'string' },
+  annotations: {
+    title: 'Delete User',
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
+  handler: async ({ userId }) => { /* ... */ },
+});
+```
+
+### AirToolAnnotations
+
+```typescript
+interface AirToolAnnotations {
+  title?: string;            // Human-readable title
+  readOnlyHint?: boolean;    // No data modification
+  destructiveHint?: boolean; // Deletes, overwrites, etc.
+  idempotentHint?: boolean;  // Same input → same result
+  openWorldHint?: boolean;   // Interacts with external systems
+}
+```
+
+## Structured Output <Badge text="0.2.0" />
+
+MCP 2025-06-18 spec. Define output schema — handler result auto-converts to `structuredContent`.
+
+```typescript
+defineTool('get_user', {
+  params: { userId: 'string' },
+  outputSchema: { name: 'string', email: 'string', age: 'number?' },
+  handler: async ({ userId }) => ({
+    name: 'Alice',
+    email: 'alice@example.com',
+    age: 30,
+  }),
+});
+```
+
+`outputSchema` uses the same `AirToolParams` format as `params`.
 
 ## Parameter types
 
@@ -76,6 +127,43 @@ interface AirToolContext {
   serverName: string;
   startedAt: number;
   state: Record<string, any>;
+  signal?: AbortSignal;       // Request cancellation (0.2.0)
+  elicit?: (message: string, schema: AirElicitSchema) => Promise<AirElicitResult>;  // (0.2.0)
+}
+```
+
+### Elicitation <Badge text="0.2.0" />
+
+MCP 2025-06-18 spec. Request user input mid-execution. Available when the client supports elicitation.
+
+```typescript
+defineTool('deploy', {
+  params: { env: 'string' },
+  annotations: { destructiveHint: true },
+  handler: async ({ env }, ctx) => {
+    if (env === 'production' && ctx.elicit) {
+      const confirm = await ctx.elicit('Deploy to production?', {
+        confirmed: { type: 'boolean', description: 'Confirm deployment' },
+      });
+      if (confirm.action !== 'accept') return 'Deployment cancelled';
+    }
+    return `Deployed to ${env}`;
+  },
+});
+```
+
+```typescript
+interface AirElicitSchema {
+  [key: string]: {
+    type: 'string' | 'number' | 'boolean';
+    description?: string;
+    required?: boolean;
+  };
+}
+
+interface AirElicitResult {
+  action: 'accept' | 'decline' | 'cancel';
+  content?: Record<string, any>;
 }
 ```
 
@@ -109,15 +197,37 @@ Convert handler return to MCP content array.
 | `[1,2,3]` | `[{ type: 'text', text: '[\n  1,\n  2,\n  3\n]' }]` |
 | `{ text: 'hi' }` | `[{ type: 'text', text: 'hi' }]` |
 | `{ image: 'b64', mimeType: '...' }` | `[{ type: 'image', data: 'b64', mimeType: '...' }]` |
+| `{ resource: { uri, name?, ... } }` | `[{ type: 'resource_link', uri, name?, ... }]` |
 | `{ content: [...] }` | Passthrough |
+
+### Resource Links <Badge text="0.2.0" />
+
+MCP 2025-06-18 spec. Return a reference to a resource instead of inlining data.
+
+```typescript
+defineTool('get_report', {
+  params: { reportId: 'string' },
+  handler: async ({ reportId }) => ({
+    resource: {
+      uri: `report://reports/${reportId}`,
+      name: `Report ${reportId}`,
+      description: 'Quarterly report',
+      mimeType: 'application/pdf',
+    },
+  }),
+});
+```
 
 ### McpContent
 
 ```typescript
 interface McpContent {
-  type: 'text' | 'image' | 'resource';
+  type: 'text' | 'image' | 'resource' | 'resource_link';
   text?: string;
   data?: string;
   mimeType?: string;
+  uri?: string;          // resource_link only
+  name?: string;         // resource_link only
+  description?: string;  // resource_link only
 }
 ```

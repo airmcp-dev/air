@@ -39,6 +39,10 @@ Windsurf, Cline, Aider 등 대부분의 AI 코딩 도구에서 사용할 수 있
 ## 포함 내용
 
 - defineServer, defineTool, defineResource, definePrompt 전체 API
+- 도구 어노테이션 (readOnlyHint, destructiveHint, idempotentHint, openWorldHint)
+- 구조화된 출력 (outputSchema + structuredContent)
+- Elicitation (ctx.elicit — 도구 실행 중 사용자 입력 요청)
+- 리소스 링크 (resource_link 콘텐츠 타입)
 - 19개 내장 플러그인 시그니처와 권장 순서
 - StorageAdapter 전체 메서드 (set/get/delete/list/entries/append/query)
 - 미들웨어 작성법 (before/after/onError)
@@ -46,4 +50,4 @@ Windsurf, Cline, Aider 등 대부분의 AI 코딩 도구에서 사용할 수 있
 - CLI 명령어와 지원 클라이언트 목록
 - Gateway 설정
 - 커스텀 플러그인 구조
-- 주의사항 (ESM, stdio 로그, TTL 단위 등)
+- 주의사항 (ESM, stdio 로그, TTL 단위, elicitation 가드 등)

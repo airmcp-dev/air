@@ -20,6 +20,8 @@ const tool = defineTool('search', {
 function defineTool(name: string, options: {
   description?: string;
   params?: AirToolParams;
+  outputSchema?: AirToolParams;       // MCP 2025-06-18 구조화된 출력
+  annotations?: AirToolAnnotations;   // MCP 2025-03-26 도구 어노테이션
   handler: AirToolHandler;
   layer?: number;             // L1-L7 Meter 힌트
   tags?: string[];
@@ -33,10 +35,62 @@ interface AirToolDef {
   name: string;
   description?: string;
   params?: AirToolParams;
+  outputSchema?: AirToolParams;
+  annotations?: AirToolAnnotations;
   handler: AirToolHandler;
   layer?: number;
   tags?: string[];
 }
+```
+
+## 도구 어노테이션 <Badge text="0.2.0" />
+
+MCP 2025-03-26 스펙. 도구 동작에 대한 힌트를 클라이언트에 전달합니다. 모든 필드 선택.
+
+```typescript
+defineTool('delete_user', {
+  description: '사용자를 영구 삭제합니다',
+  params: { userId: 'string' },
+  annotations: {
+    title: '사용자 삭제',
+    readOnlyHint: false,        // 데이터 변경 있음
+    destructiveHint: true,      // 파괴적 작업
+    idempotentHint: false,      // 멱등성 없음
+    openWorldHint: true,        // 외부 시스템 상호작용
+  },
+  handler: async ({ userId }) => { /* ... */ },
+});
+```
+
+### AirToolAnnotations
+
+```typescript
+interface AirToolAnnotations {
+  title?: string;            // 사람이 읽을 수 있는 제목
+  readOnlyHint?: boolean;    // 읽기 전용 (데이터 변경 없음)
+  destructiveHint?: boolean; // 파괴적 작업 (삭제, 덮어쓰기 등)
+  idempotentHint?: boolean;  // 멱등성 (같은 입력 → 같은 결과)
+  openWorldHint?: boolean;   // 외부 시스템과 상호작용
+}
+```
+
+## 구조화된 출력 <Badge text="0.2.0" />
+
+MCP 2025-06-18 스펙. 출력 스키마를 정의하면 핸들러 결과가 자동으로 `structuredContent`로 변환됩니다.
+
+```typescript
+defineTool('get_user', {
+  params: { userId: 'string' },
+  outputSchema: { name: 'string', email: 'string', age: 'number?' },
+  handler: async ({ userId }) => ({
+    name: 'Alice',
+    email: 'alice@example.com',
+    age: 30,
+  }),
+});
+```
+
+`outputSchema`는 `params`와 동일한 `AirToolParams` 형식 (단축, 객체, zod 혼합 가능).
 ```
 
 ## 파라미터 타입
@@ -105,6 +159,43 @@ interface AirToolContext {
   serverName: string;
   startedAt: number;          // Date.now()
   state: Record<string, any>; // server.state 참조
+  signal?: AbortSignal;       // 요청 취소 시그널 (0.2.0)
+  elicit?: (message: string, schema: AirElicitSchema) => Promise<AirElicitResult>;  // (0.2.0)
+}
+```
+
+### Elicitation (사용자 입력 요청) <Badge text="0.2.0" />
+
+MCP 2025-06-18 스펙. 도구 실행 중 사용자에게 입력을 요청합니다. 클라이언트가 elicitation을 지원할 때만 사용 가능합니다.
+
+```typescript
+defineTool('deploy', {
+  params: { env: 'string' },
+  annotations: { destructiveHint: true },
+  handler: async ({ env }, ctx) => {
+    if (env === 'production' && ctx.elicit) {
+      const confirm = await ctx.elicit('프로덕션에 배포합니다. 확인해주세요.', {
+        confirmed: { type: 'boolean', description: '배포 확인' },
+      });
+      if (confirm.action !== 'accept') return '배포 취소됨';
+    }
+    return `${env} 배포 완료`;
+  },
+});
+```
+
+```typescript
+interface AirElicitSchema {
+  [key: string]: {
+    type: 'string' | 'number' | 'boolean';
+    description?: string;
+    required?: boolean;
+  };
+}
+
+interface AirElicitResult {
+  action: 'accept' | 'decline' | 'cancel';
+  content?: Record<string, any>;  // accept 시 사용자 입력 값
 }
 ```
 
@@ -153,15 +244,37 @@ import { normalizeResult } from '@airmcp-dev/core';
 | `{ name: 'A' }` | `[{ type: 'text', text: '{\n  "name": "A"\n}' }]` |
 | `{ text: 'hi' }` | `[{ type: 'text', text: 'hi' }]` |
 | `{ image: 'b64', mimeType: 'image/png' }` | `[{ type: 'image', data: 'b64', mimeType: 'image/png' }]` |
+| `{ resource: { uri, name?, ... } }` | `[{ type: 'resource_link', uri, name?, ... }]` |
 | `{ content: [...] }` | 그대로 반환 |
+
+### 리소스 링크 <Badge text="0.2.0" />
+
+MCP 2025-06-18 스펙. 데이터를 직접 포함하지 않고 리소스 URI를 참조로 반환합니다.
+
+```typescript
+defineTool('get_report', {
+  params: { reportId: 'string' },
+  handler: async ({ reportId }) => ({
+    resource: {
+      uri: `report://reports/${reportId}`,
+      name: `리포트 ${reportId}`,
+      description: '분기 보고서',
+      mimeType: 'application/pdf',
+    },
+  }),
+});
+```
 
 ### McpContent
 
 ```typescript
 interface McpContent {
-  type: 'text' | 'image' | 'resource';
+  type: 'text' | 'image' | 'resource' | 'resource_link';
   text?: string;
   data?: string;
   mimeType?: string;
+  uri?: string;          // resource_link 전용
+  name?: string;         // resource_link 전용
+  description?: string;  // resource_link 전용
 }
 ```

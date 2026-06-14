@@ -9,7 +9,7 @@ air is a TypeScript framework for building MCP (Model Context Protocol) servers.
 
 - **Packages**: `@airmcp-dev/core`, `@airmcp-dev/cli`, `@airmcp-dev/gateway`, `@airmcp-dev/logger`, `@airmcp-dev/meter`
 - **Runtime**: Node.js 18+, TypeScript ESM
-- **MCP SDK**: Uses `@modelcontextprotocol/sdk ^1.12.0` internally
+- **MCP SDK**: Uses `@modelcontextprotocol/sdk ^1.29.0` internally (MCP spec 2025-11-25 compatible)
 - **License**: Apache-2.0
 
 ## Core API
@@ -48,12 +48,30 @@ defineTool('search', {
     email: { type: 'string', description: 'Email', optional: true },  // Object form
     tags: z.array(z.string()),          // Zod also works
   },
+  outputSchema: {                       // MCP 2025-06-18 Structured Output (optional)
+    title: 'string',
+    score: 'number',
+  },
+  annotations: {                        // MCP 2025-03-26 Tool Annotations (optional)
+    readOnlyHint: true,
+    destructiveHint: false,
+  },
   layer: 4,                             // L1-L7 Meter hint (optional)
   handler: async ({ query, limit }, context) => {
-    // context: { requestId, serverName, startedAt, state }
+    // context: { requestId, serverName, startedAt, state, signal?, elicit? }
+    //
+    // context.signal — AbortSignal for request cancellation
+    // context.elicit — request user input mid-execution (if client supports):
+    //   const result = await context.elicit('Confirm?', { ok: { type: 'boolean' } });
+    //   result: { action: 'accept'|'decline'|'cancel', content?: { ok: true } }
+    //
     // Return value auto-converts to MCP content:
     //   string → text, number/boolean → String, object/array → JSON.stringify
-    //   { text } → text, { image, mimeType } → image, { content: [...] } → passthrough
+    //   { text } → text, { image, mimeType } → image
+    //   { resource: { uri, name?, mimeType? } } → resource_link (MCP 2025-06-18)
+    //   { content: [...] } → passthrough
+    //
+    // With outputSchema: result auto-wraps as structuredContent
     return await doSearch(query, limit);
   },
 });
@@ -258,3 +276,7 @@ function myPlugin(options?: MyOptions): AirPlugin {
 - `authPlugin`'s `_auth` param must be defined in tool params for MCP client passthrough
 - `fallbackPlugin` maps tool names, not values: `{ 'primary': 'backup' }`
 - `queuePlugin`'s `concurrency` is a map: `{ 'db': 3, '*': 10 }`
+- `ctx.elicit` is `undefined` when the client doesn't support elicitation — always check before calling
+- `outputSchema` uses the same `AirToolParams` format as `params` — shorthand, object, or zod
+- `annotations` are hints only — clients may ignore them. Don't rely on them for security
+- `resource_link` returns a URI reference, not inline data — the client fetches the resource separately

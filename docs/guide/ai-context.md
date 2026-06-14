@@ -39,6 +39,10 @@ Copy the content below and use as needed.
 ## What's included
 
 - defineServer, defineTool, defineResource, definePrompt full API
+- Tool Annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint)
+- Structured Output (outputSchema + structuredContent)
+- Elicitation (ctx.elicit — request user input mid-execution)
+- Resource Links (resource_link content type)
 - All 19 built-in plugin signatures and recommended order
 - StorageAdapter full methods (set/get/delete/list/entries/append/query)
 - Middleware authoring (before/after/onError)
@@ -46,4 +50,4 @@ Copy the content below and use as needed.
 - CLI commands and supported client list
 - Gateway config
 - Custom plugin structure
-- Gotchas (ESM, stdio logging, TTL units, etc.)
+- Gotchas (ESM, stdio logging, TTL units, elicitation guards, etc.)
