@@ -57,20 +57,83 @@ export class ServerRunner {
 
   // ── 팩토리 메서드: 임의의 McpServer 인스턴스에 도구/리소스/프롬프트를 등록 ──
 
-  /** 도구를 지정 McpServer에 등록 */
+  /** 도구를 지정 McpServer에 등록 (SDK registerTool API 사용) */
   private registerToolToServer(server: McpServer, tool: AirToolDef) {
-    const zodSchema = paramsToZodSchema(tool.params);
-    if (zodSchema) {
-      server.tool(tool.name, tool.description || '', zodSchema.shape, async (params: any) => {
-        const reqCtx = createRequestContext(this.config.name, this.serverCtx.state);
-        const content = await this.middlewareChain.execute(tool, params || {}, reqCtx);
-        return { content } as any;
+    const inputSchema = paramsToZodSchema(tool.params);
+    const outputSchema = paramsToZodSchema(tool.outputSchema);
+
+    const config: Record<string, any> = {};
+    if (tool.description) config.description = tool.description;
+    if (tool.annotations?.title) config.title = tool.annotations.title;
+    if (inputSchema) config.inputSchema = inputSchema.shape;
+    if (outputSchema) config.outputSchema = outputSchema.shape;
+    if (tool.annotations) {
+      const { title, ...hints } = tool.annotations;
+      if (Object.keys(hints).length > 0) config.annotations = hints;
+    }
+
+    // 공통 핸들러 로직 — params와 extra에서 컨텍스트 구성 후 미들웨어 실행
+    const buildHandler = (params: Record<string, any>, extra: any) => {
+      const ctxOptions: Record<string, any> = {};
+      if (extra?.signal) ctxOptions.signal = extra.signal;
+
+      // extra.sendRequest를 통한 elicit 래퍼 생성
+      if (typeof extra?.sendRequest === 'function') {
+        ctxOptions.elicit = async (message: string, schema: Record<string, any>) => {
+          const properties: Record<string, any> = {};
+          for (const [key, def] of Object.entries(schema)) {
+            const d = def as { type: string; description?: string };
+            properties[key] = { type: d.type, ...(d.description ? { description: d.description } : {}) };
+          }
+          const result = await extra.sendRequest(
+            { method: 'elicitation/create', params: { message, requestedSchema: { type: 'object', properties } } },
+            { parse: (data: any) => data },
+          );
+          return { action: result.action, content: result.content };
+        };
+      }
+
+      return createRequestContext(this.config.name, this.serverCtx.state, ctxOptions);
+    };
+
+    const formatResult = async (params: Record<string, any>, extra: any) => {
+      const reqCtx = buildHandler(params, extra);
+      const content = await this.middlewareChain.execute(tool, params, reqCtx);
+
+      // outputSchema가 있으면 structuredContent로 반환
+      if (outputSchema && Array.isArray(content) && content.length > 0) {
+        const firstText = content[0];
+        if (firstText && typeof firstText === 'object' && 'text' in firstText && typeof firstText.text === 'string') {
+          try {
+            return { content, structuredContent: JSON.parse(firstText.text) } as any;
+          } catch { /* fall through */ }
+        }
+      }
+      return { content } as any;
+    };
+
+    // inputSchema 유무에 따라 콜백 시그니처 분기
+    if (inputSchema) {
+      const typedConfig = {
+        ...(tool.description ? { description: tool.description } : {}),
+        ...(tool.annotations?.title ? { title: tool.annotations.title } : {}),
+        inputSchema: inputSchema.shape,
+        ...(outputSchema ? { outputSchema: outputSchema.shape } : {}),
+        ...(config.annotations ? { annotations: config.annotations } : {}),
+      };
+      server.registerTool(tool.name, typedConfig, async (params: any, extra: any) => {
+        return formatResult(params || {}, extra);
       });
     } else {
-      server.tool(tool.name, tool.description || '', async (params: any) => {
-        const reqCtx = createRequestContext(this.config.name, this.serverCtx.state);
-        const content = await this.middlewareChain.execute(tool, params || {}, reqCtx);
-        return { content } as any;
+      const typedConfig = {
+        ...(tool.description ? { description: tool.description } : {}),
+        ...(tool.annotations?.title ? { title: tool.annotations.title } : {}),
+        ...(outputSchema ? { outputSchema: outputSchema.shape } : {}),
+        ...(config.annotations ? { annotations: config.annotations } : {}),
+      };
+      // inputSchema 없으면 콜백이 (extra) 한 개만 받음
+      server.registerTool(tool.name, typedConfig, async (extra: any) => {
+        return formatResult({}, extra);
       });
     }
   }
@@ -136,6 +199,13 @@ export class ServerRunner {
     this.serverCtx.status = 'starting';
     const transportType = detectTransport(this.config.transport);
 
+    // stdio 모드에서는 stdout이 MCP JSON-RPC 전용이므로
+    // console.log를 stderr로 리다이렉트하여 프로토콜 오염 방지
+    if (transportType === 'stdio') {
+      const _origLog = console.log;
+      console.log = (...args: any[]) => console.error(...args);
+    }
+
     console.log(
       `[air] Starting "${this.config.name}" (${transportType} transport, ${this.tools.length} tools)`,
     );
@@ -161,6 +231,9 @@ export class ServerRunner {
       const port = this.config.transport?.port || this.config.dev?.port || 3100;
 
       const server = createServer(async (req, res) => {
+        // MCP-Protocol-Version 헤더 설정 (2025-06-18 스펙)
+        res.setHeader('MCP-Protocol-Version', '2025-11-25');
+
         if (req.method === 'POST') {
           await httpTransport.handleRequest(req, res);
         } else if (req.method === 'GET') {
@@ -205,7 +278,9 @@ export class ServerRunner {
       // CORS 헤더
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, MCP-Protocol-Version');
+      // MCP-Protocol-Version 헤더 설정 (2025-06-18 스펙)
+      res.setHeader('MCP-Protocol-Version', '2025-11-25');
 
       if (req.method === 'OPTIONS') {
         res.writeHead(204).end();

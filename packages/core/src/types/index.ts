@@ -9,6 +9,10 @@ export type {
   AirToolContext,
   AirToolResponse,
   AirToolDef,
+  AirToolAnnotations,
+  AirElicitSchema,
+  AirElicitResult,
+  AirResourceLink,
 } from './tool.js';
 export type { AirResourceDef, AirResourceContext, AirResourceContent } from './resource.js';
 export type { AirPromptDef, AirPromptArg, AirPromptMessage } from './prompt.js';

@@ -4,10 +4,14 @@
 import type { AirToolResponse } from '../types/tool.js';
 
 export interface McpContent {
-  type: 'text' | 'image' | 'resource';
+  type: 'text' | 'image' | 'resource' | 'resource_link';
   text?: string;
   data?: string;
   mimeType?: string;
+  /** resource_link 전용 */
+  uri?: string;
+  name?: string;
+  description?: string;
 }
 
 /** AirToolResponse를 MCP content 배열로 변환 */
@@ -39,6 +43,18 @@ export function normalizeResult(result: AirToolResponse): McpContent[] {
     return [
       { type: 'image', data: result.image, mimeType },
     ];
+  }
+
+  // { resource: { uri, name?, ... } } → resource_link content (MCP 2025-06-18)
+  if ('resource' in result && typeof result.resource === 'object' && result.resource !== null) {
+    const r = result.resource;
+    return [{
+      type: 'resource_link',
+      uri: r.uri,
+      ...(r.name ? { name: r.name } : {}),
+      ...(r.description ? { description: r.description } : {}),
+      ...(r.mimeType ? { mimeType: r.mimeType } : {}),
+    }];
   }
 
   // 기타 객체 → JSON text
