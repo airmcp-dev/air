@@ -29,6 +29,7 @@ const guideSidebar = (prefix: string, ko = false) => [
       { text: ko ? '미들웨어' : 'Middleware', link: `${prefix}/guide/middleware` },
       { text: ko ? '에러 처리' : 'Error Handling', link: `${prefix}/guide/error-handling` },
       { text: ko ? '로깅' : 'Logging', link: `${prefix}/guide/logging` },
+      { text: 'Shield', link: `${prefix}/guide/shield` },
     ],
   },
   {
@@ -119,6 +120,7 @@ const apiSidebar = (prefix: string, ko = false) => [
     items: [
       { text: '@airmcp-dev/cli', link: `${prefix}/api/cli` },
       { text: '@airmcp-dev/gateway', link: `${prefix}/api/gateway` },
+      { text: '@airmcp-dev/shield', link: `${prefix}/api/shield` },
       { text: '@airmcp-dev/logger', link: `${prefix}/api/logger` },
       { text: '@airmcp-dev/meter', link: `${prefix}/api/meter` },
     ],
