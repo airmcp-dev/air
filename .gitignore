@@ -6,5 +6,4 @@ dist/
 *.jsc
 
 # Enterprise packages (commercial, not open source)
-packages/shield/
 packages/hive/
