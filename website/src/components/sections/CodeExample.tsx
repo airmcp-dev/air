@@ -100,7 +100,7 @@ const CodeExample: FC = () => {
             {[
               { icon: 'fa-cube', label: '7 packages' },
               { icon: 'fa-puzzle-piece', label: '19 plugins' },
-              { icon: 'fa-vial', label: '165 tests' },
+              { icon: 'fa-vial', label: '295 tests' },
             ].map((s) => (
               <span key={s.label} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/[0.03] border border-white/[0.06] rounded-lg text-xs text-text-muted font-mono">
                 <i className={`fa-solid ${s.icon} text-air-500/50`} />
@@ -163,7 +163,7 @@ const CodeExample: FC = () => {
             </div>
             <div className="flex items-center gap-1.5 text-[10px] font-mono text-text-muted/40">
               <span className="w-1.5 h-1.5 rounded-full bg-air-500/50" />
-              air v0.2.0
+              air v0.4.0
             </div>
           </div>
         </div>
