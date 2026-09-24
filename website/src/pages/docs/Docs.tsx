@@ -5,6 +5,7 @@ import { FadeIn, CodeBlock } from '@/components/common';
 
 const SIDEBAR = [
   { id: 'quickstart', icon: 'fa-rocket' },
+  { id: 'whats-new', icon: 'fa-sparkles' },
   { id: 'server', icon: 'fa-cube' },
   { id: 'plugins', icon: 'fa-puzzle-piece' },
   { id: 'security', icon: 'fa-shield-halved' },
@@ -18,6 +19,45 @@ const CODE_QUICKSTART = `npx @airmcp-dev/cli create my-server
 cd my-server
 npm install
 npx @airmcp-dev/cli dev --console -p 3510`;
+
+const CODE_WHATS_NEW_SSE = `// v0.4.0: SSE with built-in resilience — no config needed
+const server = defineServer({
+  name: 'my-server',
+  transport: { type: 'sse', port: 3510 },
+  // Optional: customize SSE behavior
+  sseHeartbeatMs: 30_000,        // detect dead connections (default: 30s)
+  sseReplayBufferSize: 100,      // messages kept for reconnection (default: 100)
+  sseIdleTimeoutMs: 600_000,     // auto-close idle sessions (default: 10min)
+  tools: [ /* ... */ ],
+});
+// Clients reconnect with Last-Event-ID → missed messages replayed automatically
+// /health endpoint added for gateway integration`;
+
+const CODE_WHATS_NEW_WORKERS = `// v0.4.0: Workers transport now supports resources/read + prompts/get
+const server = defineServer({
+  name: 'my-worker',
+  transport: { type: 'workers' },
+  tools: [ defineTool('search', { ... }) ],
+  resources: [
+    defineResource('config://version', {
+      name: 'version', handler: async () => '1.0.0',
+    }),
+  ],
+  prompts: [
+    definePrompt('summarize', {
+      arguments: [{ name: 'text', required: true }],
+      handler: ({ text }) => [{ role: 'user', content: \`Summarize: \${text}\` }],
+    }),
+  ],
+});`;
+
+const CODE_WHATS_NEW_GATEWAY = `// v0.4.0: Gateway health check — cold start safe
+const gateway = new Gateway({
+  port: 4000,
+  healthCheckInterval: 15_000,
+  // NEW: wait before first health check (default: 10s)
+  // prevents marking slow-starting servers as unhealthy
+});`;
 
 const CODE_SERVER = `import { defineServer, defineTool } from '@airmcp-dev/core';
 
@@ -75,11 +115,22 @@ const CODE_SECURITY = `defineServer({
 const CODE_TRANSPORT = `// stdio -- Claude Desktop direct
 transport: { type: 'stdio' }
 
-// SSE -- remote connection
+// SSE -- remote connection (v0.4.0: heartbeat, reconnect, idle cleanup built-in)
 transport: { type: 'sse', port: 3510 }
 
+// SSE with custom options
+transport: { type: 'sse', port: 3510 },
+sseHeartbeatMs: 30_000,       // ping interval (0 = disable)
+sseReplayBufferSize: 100,     // messages kept for Last-Event-ID reconnect
+sseReplayTtlMs: 300_000,      // replay buffer TTL (5min)
+sseIdleTimeoutMs: 600_000,    // auto-close idle sessions (10min)
+maxSseSessions: 200,          // max concurrent SSE sessions
+
 // Streamable HTTP
-transport: { type: 'http', port: 3510 }`;
+transport: { type: 'http', port: 3510 }
+
+// Cloudflare Workers (edge)
+transport: { type: 'workers' }`;
 
 const CODE_STORAGE = `import { MemoryStore, FileStore, createStorage } from '@airmcp-dev/core';
 
@@ -183,6 +234,46 @@ const Docs: FC = () => {
               </h2>
               <p className="text-text-secondary text-sm mb-4">{t('doc.qs.desc')}</p>
               <CodeBlock code={CODE_QUICKSTART} language="bash" filename="terminal" />
+            </FadeIn>
+          </section>
+
+          {/* What's New in v0.4.0 */}
+          <section id="whats-new" className="mb-16 scroll-mt-24">
+            <FadeIn>
+              <h2 className="font-display text-lg font-bold text-text-primary mb-2 flex items-center gap-2">
+                <i className="fa-solid fa-sparkles text-air-500/50 text-sm" />
+                {t('doc.nav.whats-new')}
+              </h2>
+              <p className="text-text-secondary text-sm mb-6">{t('doc.whatsnew.desc')}</p>
+
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-air-500" />
+                    {t('doc.whatsnew.sse.title')}
+                  </h3>
+                  <p className="text-text-muted text-[12px] mb-3">{t('doc.whatsnew.sse.desc')}</p>
+                  <CodeBlock code={CODE_WHATS_NEW_SSE} language="typescript" filename="server.ts" />
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-air-500" />
+                    {t('doc.whatsnew.workers.title')}
+                  </h3>
+                  <p className="text-text-muted text-[12px] mb-3">{t('doc.whatsnew.workers.desc')}</p>
+                  <CodeBlock code={CODE_WHATS_NEW_WORKERS} language="typescript" filename="worker.ts" />
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-air-500" />
+                    {t('doc.whatsnew.gateway.title')}
+                  </h3>
+                  <p className="text-text-muted text-[12px] mb-3">{t('doc.whatsnew.gateway.desc')}</p>
+                  <CodeBlock code={CODE_WHATS_NEW_GATEWAY} language="typescript" filename="gateway.ts" />
+                </div>
+              </div>
             </FadeIn>
           </section>
 
