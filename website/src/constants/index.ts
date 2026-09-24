@@ -14,7 +14,7 @@ export const PACKAGES: PackageInfo[] = [
   { name: '@airmcp-dev/gateway', license: 'Apache-2.0', descriptionKey: 'packages.gateway' },
   { name: '@airmcp-dev/logger', license: 'Apache-2.0', descriptionKey: 'packages.logger' },
   { name: '@airmcp-dev/meter', license: 'Apache-2.0', descriptionKey: 'packages.meter' },
-  { name: '@airmcp-dev/shield', license: 'Commercial', descriptionKey: 'packages.shield' },
+  { name: '@airmcp-dev/shield', license: 'Apache-2.0', descriptionKey: 'packages.shield' },
   { name: '@airmcp-dev/hive', license: 'Commercial', descriptionKey: 'packages.hive' },
 ];
 
