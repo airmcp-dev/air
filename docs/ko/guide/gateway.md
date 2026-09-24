@@ -58,6 +58,8 @@ interface GatewayConfig {
   name?: string;                  // 게이트웨이 이름
   port?: number;                  // HTTP 리스닝 포트
   healthCheckInterval?: number;   // 헬스 체크 주기 (ms, 기본: 15000)
+  healthCheckTimeout?: number;    // 헬스 체크 타임아웃 (ms, 기본: 5000)
+  initialDelayMs?: number;        // 첫 체크까지 대기 (ms, 기본: 10000, v0.4.0+ 콜드 스타트 안전)
   balancer?: BalancerStrategy;    // 로드밸런서 전략
   requestTimeout?: number;        // 요청 타임아웃 (ms)
 }

@@ -16,11 +16,32 @@ No port needed. Logs are sent to **stderr** (stdout is reserved for MCP protocol
 
 ## SSE (Server-Sent Events)
 
-HTTP-based remote connection. A separate MCP server instance is created per session.
+HTTP-based remote connection. A separate MCP server instance is created per session. Since v0.4.0, air uses its own `AirSSETransport` with built-in heartbeat, reconnection recovery, and idle session cleanup.
 
 ```typescript
 defineServer({
   transport: { type: 'sse', port: 3510 },
+});
+```
+
+### SSE options (v0.4.0+)
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `sseHeartbeatMs` | `30000` | Ping interval to detect dead connections. `0` to disable |
+| `sseReplayBufferSize` | `100` | Messages kept for Last-Event-ID reconnection |
+| `sseReplayTtlMs` | `300000` | Replay buffer TTL (5 minutes) |
+| `sseIdleTimeoutMs` | `600000` | Auto-close sessions idle for 10 minutes |
+| `maxSseSessions` | `200` | Max concurrent SSE sessions (503 when exceeded) |
+
+```typescript
+defineServer({
+  transport: { type: 'sse', port: 3510 },
+  sseHeartbeatMs: 30_000,
+  sseReplayBufferSize: 100,
+  sseReplayTtlMs: 300_000,
+  sseIdleTimeoutMs: 600_000,
+  maxSseSessions: 200,
 });
 ```
 
@@ -31,12 +52,27 @@ defineServer({
 | `GET` | `/sse` | Open SSE stream (creates new session) |
 | `POST` | `/message?sessionId=xxx` | Send message |
 | `GET` | `/` | Server status JSON |
+| `GET` | `/health` | Health check with session count (v0.4.0+) |
 | `OPTIONS` | `*` | CORS preflight (auto-handled) |
 
 Client connection flow:
 1. `GET /sse` → establishes SSE connection, assigns session ID
 2. `POST /message?sessionId=xxx` → sends MCP messages
 3. On disconnect, session is automatically cleaned up
+
+### Reconnection (v0.4.0+)
+
+Every SSE message includes an `id:` field. When a client reconnects with `Last-Event-ID` header, missed messages are automatically replayed from the buffer.
+
+```
+// Client reconnects with header:
+// Last-Event-ID: 42
+// → Server replays messages 43, 44, 45, ...
+```
+
+### Heartbeat (v0.4.0+)
+
+A `:ping` comment is sent every `sseHeartbeatMs` to detect broken connections early. If the write fails, the session is immediately closed and cleaned up.
 
 Terminal output:
 
@@ -111,10 +147,13 @@ export default {
 ```
 
 `server.fetch` handles:
-- `initialize` → server info + capabilities
+- `initialize` → server info + capabilities (tools, resources, prompts)
 - `tools/list` → tool schemas with annotations
 - `tools/call` → executes through the full middleware chain
-- `resources/list`, `prompts/list` → if registered
+- `resources/list` → list registered resources
+- `resources/read` → read resource content by URI (v0.4.0+)
+- `prompts/list` → list registered prompts
+- `prompts/get` → get prompt messages by name (v0.4.0+)
 - `notifications/initialized` → 204 No Content
 
 ::: tip

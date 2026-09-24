@@ -16,11 +16,32 @@ defineServer({
 
 ## SSE (Server-Sent Events)
 
-HTTP 기반 원격 연결. 세션별 독립 MCP 서버 인스턴스가 생성됩니다.
+HTTP 기반 원격 연결. 세션별 독립 MCP 서버 인스턴스가 생성됩니다. v0.4.0부터 자체 구현한 `AirSSETransport`를 사용하여 하트비트, 재연결 복구, 유휴 세션 자동 정리를 내장합니다.
 
 ```typescript
 defineServer({
   transport: { type: 'sse', port: 3510 },
+});
+```
+
+### SSE 옵션 (v0.4.0+)
+
+| 옵션 | 기본값 | 설명 |
+|------|--------|------|
+| `sseHeartbeatMs` | `30000` | 죽은 연결 감지용 ping 간격. `0`이면 비활성 |
+| `sseReplayBufferSize` | `100` | Last-Event-ID 재연결을 위해 보관하는 메시지 수 |
+| `sseReplayTtlMs` | `300000` | 재전송 버퍼 TTL (5분) |
+| `sseIdleTimeoutMs` | `600000` | 10분 유휴 세션 자동 종료 |
+| `maxSseSessions` | `200` | 최대 동시 SSE 세션 수 (초과 시 503) |
+
+```typescript
+defineServer({
+  transport: { type: 'sse', port: 3510 },
+  sseHeartbeatMs: 30_000,
+  sseReplayBufferSize: 100,
+  sseReplayTtlMs: 300_000,
+  sseIdleTimeoutMs: 600_000,
+  maxSseSessions: 200,
 });
 ```
 
@@ -31,12 +52,27 @@ defineServer({
 | `GET` | `/sse` | SSE 스트림 연결 (새 세션 생성) |
 | `POST` | `/message?sessionId=xxx` | 메시지 전송 |
 | `GET` | `/` | 서버 상태 JSON 반환 |
+| `GET` | `/health` | 헬스체크 + 세션 수 (v0.4.0+) |
 | `OPTIONS` | `*` | CORS preflight (자동 처리) |
 
 클라이언트 연결 흐름:
 1. `GET /sse` → SSE 연결 수립, 세션 ID 발급
 2. `POST /message?sessionId=xxx` → MCP 메시지 전송
 3. 연결 종료 시 세션 자동 정리
+
+### 재연결 복구 (v0.4.0+)
+
+모든 SSE 메시지에 `id:` 필드가 포함됩니다. 클라이언트가 `Last-Event-ID` 헤더와 함께 재연결하면, 누락된 메시지가 버퍼에서 자동으로 재전송됩니다.
+
+```
+// 클라이언트가 헤더와 함께 재연결:
+// Last-Event-ID: 42
+// → 서버가 메시지 43, 44, 45, ... 재전송
+```
+
+### 하트비트 (v0.4.0+)
+
+`sseHeartbeatMs` 간격으로 `:ping` 코멘트를 전송하여 끊어진 연결을 조기에 감지합니다. write가 실패하면 세션을 즉시 종료하고 정리합니다.
 
 터미널 출력:
 
@@ -111,10 +147,13 @@ export default {
 ```
 
 `server.fetch`가 처리하는 JSON-RPC 메서드:
-- `initialize` → 서버 정보 + capabilities
+- `initialize` → 서버 정보 + capabilities (tools, resources, prompts)
 - `tools/list` → 도구 스키마 (annotations 포함)
 - `tools/call` → 미들웨어 체인을 거쳐 도구 실행
-- `resources/list`, `prompts/list` → 등록된 경우
+- `resources/list` → 등록된 리소스 목록
+- `resources/read` → URI로 리소스 내용 읽기 (v0.4.0+)
+- `prompts/list` → 등록된 프롬프트 목록
+- `prompts/get` → 이름으로 프롬프트 메시지 조회 (v0.4.0+)
 - `notifications/initialized` → 204 No Content
 
 ::: tip

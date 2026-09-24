@@ -57,6 +57,8 @@ interface GatewayConfig {
   name?: string;
   port?: number;
   healthCheckInterval?: number;   // ms, default: 15000
+  healthCheckTimeout?: number;    // ms, default: 5000
+  initialDelayMs?: number;        // ms, default: 10000 (v0.4.0+, cold start safe)
   balancer?: BalancerStrategy;
   requestTimeout?: number;        // ms
 }
