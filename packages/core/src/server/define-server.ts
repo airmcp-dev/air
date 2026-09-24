@@ -206,6 +206,9 @@ export function defineServer(options: AirServerOptions): AirServer {
     get state() {
       return runner.getContext().state;
     },
+
+    // Workers fetch 핸들러 — transport: 'workers'일 때 사용
+    fetch: runner.createFetchHandler(),
   };
 
   return server;

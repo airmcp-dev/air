@@ -1,6 +1,6 @@
 {
   "name": "@airmcp-dev/gateway",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MCP reverse proxy, server registry, and request router",
   "type": "module",
   "files": ["dist", "README.md", "LICENSE"],

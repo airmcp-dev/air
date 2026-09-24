@@ -1,7 +1,7 @@
 import { type FC, useState } from 'react';
 import { useLanguage } from '@/hooks';
 import { FadeIn, CodeBlock } from '@/components/common';
-import { GITHUB_URL } from '@/constants';
+
 
 const SIDEBAR = [
   { id: 'quickstart', icon: 'fa-rocket' },
@@ -153,9 +153,9 @@ const Docs: FC = () => {
           ))}
         </nav>
         <div className="mt-6 pt-4 border-t border-white/[0.04]">
-          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer"
+          <a href="https://www.npmjs.com/org/airmcp-dev" target="_blank" rel="noopener noreferrer"
              className="flex items-center gap-2 px-3 py-2 text-[12px] text-text-muted hover:text-text-secondary transition-colors">
-            <i className="fa-brands fa-github text-xs" /> GitHub
+            <i className="fa-brands fa-npm text-xs" /> npm
             <i className="fa-solid fa-arrow-up-right-from-square text-[8px] ml-auto text-text-muted/30" />
           </a>
         </div>

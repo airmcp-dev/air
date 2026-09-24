@@ -23,7 +23,7 @@ const server = defineServer({
   name: 'my-server',              // Required
   version: '1.0.0',               // Default: '0.1.0'
   description: 'Server description',
-  transport: { type: 'sse', port: 3510 },  // 'stdio' | 'sse' | 'http' | 'auto'
+  transport: { type: 'sse', port: 3510 },  // 'stdio' | 'sse' | 'http' | 'workers' | 'auto'
   storage: { type: 'file', path: '.air/data' },  // 'memory' | 'file'
   logging: { level: 'info', format: 'json' },
   meter: { classify: true, trackCalls: true },
@@ -36,6 +36,37 @@ const server = defineServer({
 
 server.start();
 ```
+
+### Workers Transport (Cloudflare Workers)
+
+For edge deployment, use `transport: { type: 'workers' }`. No `server.start()` needed — use `server.fetch()` instead.
+
+```typescript
+import { defineServer, defineTool } from '@airmcp-dev/core';
+
+const server = defineServer({
+  name: 'my-edge-server',
+  transport: { type: 'workers' },
+  tools: [
+    defineTool('hello', {
+      params: { name: 'string' },
+      handler: async ({ name }) => `Hello, ${name}!`,
+    }),
+  ],
+});
+
+// Workers export
+export default {
+  async fetch(request: Request, env: any): Promise<Response> {
+    if (request.method === 'POST' && new URL(request.url).pathname === '/') {
+      return server.fetch!(request);
+    }
+    return Response.json(server.status());
+  },
+};
+```
+
+`server.fetch` handles MCP JSON-RPC: `initialize`, `tools/list`, `tools/call`, `resources/list`, `prompts/list`.
 
 ### defineTool
 
@@ -280,3 +311,5 @@ function myPlugin(options?: MyOptions): AirPlugin {
 - `outputSchema` uses the same `AirToolParams` format as `params` — shorthand, object, or zod
 - `annotations` are hints only — clients may ignore them. Don't rely on them for security
 - `resource_link` returns a URI reference, not inline data — the client fetches the resource separately
+- Workers transport: no `server.start()`, no filesystem, no stdio/SSE. Use `server.fetch!(request)` and D1/KV for storage
+- Workers transport: `server.fetch` is always defined on AirServer, not just when `type: 'workers'` — safe to use for testing

@@ -1,11 +1,71 @@
 import { type FC, useState, useMemo } from 'react';
 import { useLanguage } from '@/hooks';
 import { FadeIn } from '@/components/common';
-import { GITHUB_URL } from '@/constants';
 
-const FAQ_KEYS = Array.from({ length: 10 }, (_, i) => i + 1);
+
+const FAQ_KEYS = Array.from({ length: 15 }, (_, i) => i + 1);
 
 const RELEASES = [
+  {
+    version: 'v0.3.0',
+    date: '2026-06-14',
+    type: 'minor' as const,
+    changes: {
+      en: [
+        'Cloudflare Workers transport: native JSON-RPC 2.0 handling without SDK dependency',
+        'Transport auto-detection: stdio/HTTP/SSE/Workers selected automatically by environment',
+        'Elicitation support: tools can request additional user input via elicit() in context',
+        'Tool annotations: readOnlyHint, destructiveHint, idempotentHint, openWorldHint support',
+        'Shield middleware: integrated into core MiddlewareChain with per-instance state isolation',
+        'Meter middleware: integrated into core with 7-layer classification and ring buffer metrics',
+        'MCP protocol version updated to 2025-03-26',
+        'Shield package: OWASP MCP Top 10 guards (RugPull, ConfusedDeputy, ContextOvershare, SSRF, SupplyChain)',
+        'Shield package: PII detection, tokenization, and redaction module',
+        'Shield package: LicenseGuard for commercial license validation',
+      ],
+      ko: [
+        'Cloudflare Workers 트랜스포트: SDK 의존 없이 JSON-RPC 2.0 네이티브 처리',
+        '트랜스포트 자동 감지: 환경에 따라 stdio/HTTP/SSE/Workers 자동 선택',
+        'Elicitation 지원: 도구에서 elicit()로 사용자 추가 입력 요청 가능',
+        '도구 어노테이션: readOnlyHint, destructiveHint, idempotentHint, openWorldHint 지원',
+        'Shield 미들웨어: 코어 MiddlewareChain에 통합, 인스턴스별 상태 격리',
+        'Meter 미들웨어: 코어에 통합, 7계층 분류 + 링 버퍼 메트릭',
+        'MCP 프로토콜 버전 2025-03-26 업데이트',
+        'Shield 패키지: OWASP MCP Top 10 가드 (RugPull, ConfusedDeputy, ContextOvershare, SSRF, SupplyChain)',
+        'Shield 패키지: PII 탐지, 토크나이징, 마스킹 모듈',
+        'Shield 패키지: 상용 라이선스 검증 LicenseGuard',
+      ],
+    },
+  },
+  {
+    version: 'v0.2.0',
+    date: '2026-05-10',
+    type: 'minor' as const,
+    changes: {
+      en: [
+        'Streamable HTTP transport added (MCP SDK StreamableHTTPServerTransport)',
+        'Logger package: standalone structured logging with JSON/Pretty formatters and file rotation',
+        'Meter package: standalone 7-layer classification, call tracking, cost estimation',
+        'Shield package: PolicyEngine, ThreatDetector, AuditLogger, RateLimiter, Sandbox (Isolator + ScopeLimiter)',
+        'Hive package: process pool, auto-restart, tenant isolation, clustering',
+        'Plugin factory/manifest spec (AirPluginFactory, air-plugin.json)',
+        'Plugin lifecycle hooks: onInit, onStart, onStop, onToolRegister',
+        'Telemetry manager for usage tracking and event collection',
+        'CLI: added license, update, check commands (12 → 14 total)',
+      ],
+      ko: [
+        'Streamable HTTP 트랜스포트 추가 (MCP SDK StreamableHTTPServerTransport)',
+        'Logger 패키지: JSON/Pretty 포매터, 파일 로테이션 포함 독립 구조화 로깅',
+        'Meter 패키지: 7계층 분류, 호출 추적, 비용 추정 독립 패키지',
+        'Shield 패키지: PolicyEngine, ThreatDetector, AuditLogger, RateLimiter, Sandbox (Isolator + ScopeLimiter)',
+        'Hive 패키지: 프로세스 풀, 자동 재시작, 테넌트 격리, 클러스터링',
+        '플러그인 팩토리/매니페스트 규격 (AirPluginFactory, air-plugin.json)',
+        '플러그인 라이프사이클 훅: onInit, onStart, onStop, onToolRegister',
+        '텔레메트리 매니저: 사용량 추적 및 이벤트 수집',
+        'CLI: license, update, check 명령어 추가 (12 → 14개)',
+      ],
+    },
+  },
   {
     version: 'v0.1.5',
     date: '2026-04-12',
@@ -178,6 +238,22 @@ const Support: FC = () => {
         </div>
       </section>
 
+      {/* ━━━ Repository Notice ━━━ */}
+      <section className="border-t border-white/[0.04]">
+        <div className="section-container max-w-4xl py-6">
+          <FadeIn>
+            <div className="flex items-start gap-3 px-5 py-4 rounded-xl bg-air-500/[0.04] border border-air-500/10">
+              <i className="fa-solid fa-circle-info text-air-400/60 mt-0.5" />
+              <div className="text-sm text-text-secondary leading-relaxed">
+                <span className="text-text-primary font-medium">{t('support.repo.title')}</span>
+                <span className="mx-1.5">—</span>
+                {t('support.repo.desc')}
+              </div>
+            </div>
+          </FadeIn>
+        </div>
+      </section>
+
       {/* ━━━ FAQ 검색 + 목록 ━━━ */}
       <section className="py-16 border-t border-white/[0.04]">
         <div className="section-container max-w-4xl">
@@ -336,15 +412,15 @@ const Support: FC = () => {
             </div>
           </div>
 
-          {/* GitHub Releases 링크 */}
+          {/* npm 링크 */}
           <FadeIn delay={300}>
             <div className="mt-8 text-center">
-              <a href={`${GITHUB_URL}/releases`} target="_blank" rel="noopener noreferrer"
+              <a href="https://www.npmjs.com/org/airmcp-dev" target="_blank" rel="noopener noreferrer"
                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06]
                             hover:border-air-500/15 hover:bg-white/[0.04] transition-all duration-300
                             text-sm text-text-secondary hover:text-text-primary">
-                <i className="fa-brands fa-github text-xs text-air-400/50" />
-                View all releases on GitHub
+                <i className="fa-brands fa-npm text-xs text-air-400/50" />
+                View all packages on npm
                 <i className="fa-solid fa-arrow-up-right-from-square text-[9px] text-text-muted/30" />
               </a>
             </div>
@@ -364,9 +440,6 @@ const Support: FC = () => {
           </FadeIn>
           <FadeIn delay={100}>
             <div className="flex flex-wrap justify-center gap-3">
-              <a href={`${GITHUB_URL}/issues/new/choose`} target="_blank" rel="noopener noreferrer" className="btn-secondary">
-                <i className="fa-brands fa-github text-sm" /> {t('support.contact.issues')}
-              </a>
               <a href="mailto:labs@codepedia.kr" className="btn-primary">
                 <i className="fa-solid fa-envelope text-xs" /> {t('support.contact.email')}
               </a>

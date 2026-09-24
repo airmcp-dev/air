@@ -1,13 +1,14 @@
 import { type FC } from 'react';
 import { useLanguage } from '@/hooks';
 import { FadeIn } from '@/components/common';
-import { LABS_URL, GITHUB_URL } from '@/constants';
+import { LABS_URL } from '@/constants';
 
 const ROADMAP_ITEMS = [
   { versionKey: 'fnd.rm.1.version', titleKey: 'fnd.rm.1.title', statusKey: 'fnd.rm.1.status', itemsKey: 'fnd.rm.1.items' },
   { versionKey: 'fnd.rm.2.version', titleKey: 'fnd.rm.2.title', statusKey: 'fnd.rm.2.status', itemsKey: 'fnd.rm.2.items' },
   { versionKey: 'fnd.rm.3.version', titleKey: 'fnd.rm.3.title', statusKey: 'fnd.rm.3.status', itemsKey: 'fnd.rm.3.items' },
   { versionKey: 'fnd.rm.4.version', titleKey: 'fnd.rm.4.title', statusKey: 'fnd.rm.4.status', itemsKey: 'fnd.rm.4.items' },
+  { versionKey: 'fnd.rm.5.version', titleKey: 'fnd.rm.5.title', statusKey: 'fnd.rm.5.status', itemsKey: 'fnd.rm.5.items' },
 ];
 
 const Foundation: FC = () => {
@@ -38,8 +39,8 @@ const Foundation: FC = () => {
               <a href="https://docs.airmcp.dev" className="btn-primary">
                 <i className="fa-solid fa-book text-xs" /> {t('fnd.hero.cta.docs')}
               </a>
-              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="btn-secondary">
-                <i className="fa-brands fa-github" /> {t('fnd.hero.cta.github')}
+              <a href="https://www.npmjs.com/org/airmcp-dev" target="_blank" rel="noopener noreferrer" className="btn-secondary">
+                <i className="fa-brands fa-npm" /> npm
               </a>
             </div>
           </FadeIn>
@@ -132,7 +133,7 @@ const Foundation: FC = () => {
               { icon: 'fa-cube', titleKey: 'fnd.do.1.t', descKey: 'fnd.do.1.d' },
               { icon: 'fa-book-open', titleKey: 'fnd.do.2.t', descKey: 'fnd.do.2.d' },
               { icon: 'fa-puzzle-piece', titleKey: 'fnd.do.3.t', descKey: 'fnd.do.3.d' },
-              { icon: 'fa-shield-halved', titleKey: 'fnd.do.4.t', descKey: 'fnd.do.4.d' },
+              { icon: 'fa-cloud', titleKey: 'fnd.do.4.t', descKey: 'fnd.do.4.d' },
             ].map(({ icon, titleKey, descKey }, i) => (
               <FadeIn key={titleKey} delay={i * 100}>
                 <div className="group p-5 rounded-xl bg-white/[0.015] border border-white/[0.04]
@@ -169,6 +170,7 @@ const Foundation: FC = () => {
                 const status = t(statusKey);
                 const isCurrent = status === 'current';
                 const isNext = status === 'next';
+                const isDone = status === 'done';
 
                 return (
                   <FadeIn key={versionKey} delay={i * 120}>
@@ -179,11 +181,17 @@ const Foundation: FC = () => {
                           ? 'bg-air-500/20 border-2 border-air-500/40 shadow-[0_0_20px_-4px_rgba(0,212,170,0.3)]'
                           : isNext
                             ? 'bg-air-500/[0.08] border border-air-500/20'
-                            : 'bg-white/[0.03] border border-white/[0.06]'
+                            : isDone
+                              ? 'bg-emerald-500/[0.08] border border-emerald-500/20'
+                              : 'bg-white/[0.03] border border-white/[0.06]'
                         }`}>
-                        <span className={`font-mono text-[11px] font-bold ${isCurrent ? 'text-air-400' : isNext ? 'text-air-400/60' : 'text-text-muted/40'}`}>
-                          {t(versionKey)}
-                        </span>
+                        {isDone ? (
+                          <i className="fa-solid fa-check text-emerald-400/60 text-xs" />
+                        ) : (
+                          <span className={`font-mono text-[11px] font-bold ${isCurrent ? 'text-air-400' : isNext ? 'text-air-400/60' : 'text-text-muted/40'}`}>
+                            {t(versionKey)}
+                          </span>
+                        )}
                       </div>
 
                       {/* Content */}
@@ -196,6 +204,12 @@ const Foundation: FC = () => {
                           <h3 className={`font-display text-sm font-bold ${isCurrent ? 'text-air-400' : 'text-text-primary'}`}>
                             {t(titleKey)}
                           </h3>
+                          {isDone && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+                              <i className="fa-solid fa-check text-[8px] text-emerald-400" />
+                              <span className="font-mono text-[9px] text-emerald-400 uppercase">Done</span>
+                            </span>
+                          )}
                           {isCurrent && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-air-500/10 border border-air-500/20">
                               <span className="w-1.5 h-1.5 rounded-full bg-air-500 animate-glow-pulse" />
@@ -232,10 +246,10 @@ const Foundation: FC = () => {
 
           <div className="grid sm:grid-cols-2 gap-4">
             {[
-              { icon: 'fa-bug', titleKey: 'fnd.ct.1.t', descKey: 'fnd.ct.1.d', href: `${GITHUB_URL}/issues/new`, color: 'red' },
+              { icon: 'fa-bug', titleKey: 'fnd.ct.1.t', descKey: 'fnd.ct.1.d', href: 'mailto:labs@codepedia.kr', color: 'red' },
               { icon: 'fa-puzzle-piece', titleKey: 'fnd.ct.2.t', descKey: 'fnd.ct.2.d', href: 'https://docs.airmcp.dev/examples/custom-plugin', color: 'air' },
-              { icon: 'fa-pen-to-square', titleKey: 'fnd.ct.3.t', descKey: 'fnd.ct.3.d', href: `${GITHUB_URL}/tree/main/docs`, color: 'amber' },
-              { icon: 'fa-comments', titleKey: 'fnd.ct.4.t', descKey: 'fnd.ct.4.d', href: `${GITHUB_URL}/discussions`, color: 'violet' },
+              { icon: 'fa-pen-to-square', titleKey: 'fnd.ct.3.t', descKey: 'fnd.ct.3.d', href: 'mailto:labs@codepedia.kr', color: 'amber' },
+              { icon: 'fa-envelope', titleKey: 'fnd.ct.4.t', descKey: 'fnd.ct.4.d', href: 'mailto:labs@codepedia.kr', color: 'violet' },
             ].map(({ icon, titleKey, descKey, href, color }, i) => (
               <FadeIn key={titleKey} delay={i * 100}>
                 <a href={href} target="_blank" rel="noopener noreferrer"
@@ -280,8 +294,8 @@ const Foundation: FC = () => {
             <div className="space-y-3">
               {[
                 { icon: 'fa-scale-balanced', titleKey: 'fnd.gov.1.t', descKey: 'fnd.gov.1.d' },
-                { icon: 'fa-code-branch', titleKey: 'fnd.gov.2.t', descKey: 'fnd.gov.2.d' },
-                { icon: 'fa-comments', titleKey: 'fnd.gov.3.t', descKey: 'fnd.gov.3.d' },
+                { icon: 'fa-box', titleKey: 'fnd.gov.2.t', descKey: 'fnd.gov.2.d' },
+                { icon: 'fa-clipboard-list', titleKey: 'fnd.gov.3.t', descKey: 'fnd.gov.3.d' },
               ].map(({ icon, titleKey, descKey }, i) => (
                 <FadeIn key={titleKey} delay={i * 100}>
                   <div className="flex gap-3 p-4 rounded-xl bg-white/[0.015] border border-white/[0.04]
@@ -315,7 +329,7 @@ const Foundation: FC = () => {
           <div className="flex flex-wrap gap-3">
             {[
               { href: LABS_URL, icon: 'fa-solid fa-globe', label: 'CodePedia Labs', external: true },
-              { href: GITHUB_URL, icon: 'fa-brands fa-github', label: 'github.com/airmcp-dev', external: true },
+              { href: 'https://www.npmjs.com/org/airmcp-dev', icon: 'fa-brands fa-npm', label: 'npm @airmcp-dev', external: true },
               { href: 'mailto:labs@codepedia.kr', icon: 'fa-solid fa-envelope', label: 'labs@codepedia.kr', external: false },
             ].map(({ href, icon, label, external }, i) => (
               <FadeIn key={label} delay={i * 100}>

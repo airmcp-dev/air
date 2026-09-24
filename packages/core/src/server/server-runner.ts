@@ -2,7 +2,6 @@
 // MCP SDK 서버에 도구/리소스/프롬프트를 등록하고 transport를 연결하는 런타임
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AirToolDef } from '../types/tool.js';
 import type { AirResourceDef } from '../types/resource.js';
@@ -16,6 +15,8 @@ import { ServerContext } from '../context/server-context.js';
 import { detectTransport } from '../transport/auto-detect.js';
 import { createStdioTransport } from '../transport/stdio-adapter.js';
 import { createHttpTransport } from '../transport/http-adapter.js';
+import { createWorkersFetchHandler } from '../transport/workers-adapter.js';
+import { AirSSETransport, AirSSESessionManager } from '../transport/air-sse-transport.js';
 import { onShutdown } from './lifecycle.js';
 
 export class ServerRunner {
@@ -258,19 +259,30 @@ export class ServerRunner {
         await this.mcp.close();
         this.serverCtx.status = 'stopped';
       });
+    } else if (transportType === 'workers') {
+      // ── Workers Transport ──
+      // start()에서는 아무것도 안 함 — handleFetch()로 요청 처리
+      console.log(`[air] Workers mode — use server.fetch(request) or export default server`);
     }
 
     this.serverCtx.status = 'running';
   }
 
-  /** SSE transport 시작 — GET /sse + POST /message, 세션별 독립 McpServer */
+  /** SSE transport 시작 — AirSSETransport 기반, GET /sse + POST /message */
   private async startSSE() {
     const { createServer } = await import('http');
     const port = this.config.transport?.port || this.config.dev?.port || 3100;
     const maxSessions = this.config.maxSseSessions ?? 200;
 
-    // 세션별 SSE transport + McpServer를 관리
-    const sessions = new Map<string, { transport: SSEServerTransport; server: McpServer }>();
+    // 세션 관리자 — idle timeout, 자동 정리 포함
+    const sessionManager = new AirSSESessionManager({
+      maxSessions,
+      idleTimeoutMs: this.config.sseIdleTimeoutMs ?? 600_000,
+      cleanupIntervalMs: 60_000,
+    });
+
+    // 세션별 McpServer 인스턴스 관리
+    const sessionServers = new Map<string, McpServer>();
 
     const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
       const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
@@ -278,8 +290,7 @@ export class ServerRunner {
       // CORS 헤더
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, MCP-Protocol-Version');
-      // MCP-Protocol-Version 헤더 설정 (2025-06-18 스펙)
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, MCP-Protocol-Version, Last-Event-ID');
       res.setHeader('MCP-Protocol-Version', '2025-11-25');
 
       if (req.method === 'OPTIONS') {
@@ -290,31 +301,45 @@ export class ServerRunner {
       // GET /sse — 새 세션 생성 + SSE 연결
       if (req.method === 'GET' && url.pathname === '/sse') {
         // 세션 수 상한 체크
-        if (sessions.size >= maxSessions) {
+        if (sessionManager.size >= maxSessions) {
           res.writeHead(503, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: `Max sessions reached (${maxSessions})` }));
           return;
         }
 
-        const transport = new SSEServerTransport('/message', res);
-        
-        // 세션별 새 McpServer 인스턴스 생성
+        const transport = new AirSSETransport(res, {
+          endpoint: '/message',
+          heartbeatIntervalMs: this.config.sseHeartbeatMs ?? 30_000,
+          replayBufferSize: this.config.sseReplayBufferSize ?? 100,
+          replayTtlMs: this.config.sseReplayTtlMs ?? 300_000,
+        });
+
+        // 세션 등록
+        if (!sessionManager.add(transport)) {
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Max sessions reached' }));
+          return;
+        }
+
+        // 세션별 McpServer 인스턴스 생성
         const sessionServer = new McpServer({
           name: this.config.name,
           version: this.config.version || '0.1.0',
         });
-
-        // 모든 도구/리소스/프롬프트를 세션 서버에 등록
         this.registerAllToServer(sessionServer);
+        sessionServers.set(transport.id, sessionServer);
 
-        sessions.set(transport.sessionId, { transport, server: sessionServer });
-        console.log(`[air] SSE client connected (session: ${transport.sessionId})`);
+        console.log(`[air] SSE client connected (session: ${transport.id})`);
 
         transport.onclose = () => {
-          sessions.delete(transport.sessionId);
-          console.log(`[air] SSE client disconnected (session: ${transport.sessionId})`);
+          sessionManager.remove(transport.id);
+          sessionServers.delete(transport.id);
+          console.log(`[air] SSE client disconnected (session: ${transport.id})`);
         };
 
+        // Last-Event-ID 기반 재연결 지원
+        const lastEventId = req.headers['last-event-id'] as string | undefined;
+        await transport.start(lastEventId);
         await sessionServer.connect(transport);
         return;
       }
@@ -328,14 +353,21 @@ export class ServerRunner {
           return;
         }
 
-        const session = sessions.get(sessionId);
-        if (!session) {
+        const transport = sessionManager.get(sessionId);
+        if (!transport) {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Session not found' }));
           return;
         }
 
-        await session.transport.handlePostMessage(req, res);
+        await transport.handlePostMessage(req, res);
+        return;
+      }
+
+      // GET /health — 헬스체크 (게이트웨이 연동용)
+      if (req.method === 'GET' && url.pathname === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok', sessions: sessionManager.size }));
         return;
       }
 
@@ -355,13 +387,33 @@ export class ServerRunner {
 
     onShutdown(async () => {
       this.serverCtx.status = 'stopping';
-      for (const session of sessions.values()) {
-        await session.transport.close();
-      }
-      sessions.clear();
+      await sessionManager.closeAll();
+      sessionServers.clear();
       httpServer.close();
       await this.mcp.close();
       this.serverCtx.status = 'stopped';
+    });
+  }
+
+  /**
+   * Workers fetch 핸들러를 생성한다.
+   * MCP JSON-RPC 요청을 처리하고, 미들웨어 체인을 통해 도구를 실행한다.
+   */
+  createFetchHandler(): (request: Request) => Promise<Response> {
+    return createWorkersFetchHandler({
+      name: this.config.name,
+      version: this.config.version || '0.1.0',
+      tools: this.tools,
+      resources: this.resources,
+      prompts: this.prompts,
+      callTool: async (toolName: string, params: Record<string, any>) => {
+        const tool = this.tools.find(t => t.name === toolName);
+        if (!tool) {
+          throw new Error(`Tool not found: ${toolName}`);
+        }
+        const reqCtx = createRequestContext(this.config.name, this.serverCtx.state);
+        return this.middlewareChain.execute(tool, params, reqCtx);
+      },
     });
   }
 

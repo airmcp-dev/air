@@ -1,6 +1,6 @@
 # 트랜스포트
 
-air는 세 가지 MCP 트랜스포트를 지원합니다. `transport` 설정으로 선택합니다.
+air는 네 가지 MCP 트랜스포트를 지원합니다. `transport` 설정으로 선택합니다.
 
 ## stdio
 
@@ -73,6 +73,58 @@ defineServer({
 
 각 세션에 고유 ID(`crypto.randomUUID()`)가 자동 할당됩니다.
 
+## Cloudflare Workers
+
+엣지 배포용 트랜스포트. Node.js http 서버 대신 Workers 런타임에 맞는 `fetch()` 핸들러를 노출합니다. MCP 프로토콜은 JSON-RPC 2.0으로 직접 처리합니다 (런타임에 MCP SDK 의존성 없음).
+
+```typescript
+import { defineServer, defineTool } from '@airmcp-dev/core';
+
+const server = defineServer({
+  name: 'my-edge-server',
+  transport: { type: 'workers' },
+  tools: [
+    defineTool('hello', {
+      params: { name: 'string' },
+      handler: async ({ name }) => `Hello, ${name}!`,
+    }),
+  ],
+});
+
+export default {
+  async fetch(request: Request, env: any): Promise<Response> {
+    const url = new URL(request.url);
+
+    // MCP 엔드포인트
+    if (request.method === 'POST' && url.pathname === '/') {
+      return server.fetch!(request);
+    }
+
+    // 상태 확인
+    if (request.method === 'GET' && url.pathname === '/') {
+      return Response.json(server.status());
+    }
+
+    return new Response('Not Found', { status: 404 });
+  },
+};
+```
+
+`server.fetch`가 처리하는 JSON-RPC 메서드:
+- `initialize` → 서버 정보 + capabilities
+- `tools/list` → 도구 스키마 (annotations 포함)
+- `tools/call` → 미들웨어 체인을 거쳐 도구 실행
+- `resources/list`, `prompts/list` → 등록된 경우
+- `notifications/initialized` → 204 No Content
+
+::: tip
+Workers 트랜스포트에서는 `server.start()`를 호출하지 않습니다. 서버는 즉시 사용 가능 — `server.fetch(request)`만 호출하면 됩니다.
+:::
+
+::: warning
+Workers 환경에서는 `stdio`와 `sse` 트랜스포트를 사용할 수 없습니다. `workers` 트랜스포트만 지원됩니다.
+:::
+
 ## auto (기본)
 
 `type`을 생략하거나 `'auto'`로 설정하면 환경을 감지하여 자동 선택합니다:
@@ -85,9 +137,10 @@ defineServer({
 
 감지 순서:
 
-1. `MCP_TRANSPORT` 환경변수가 있으면 해당 값 사용 (`stdio`, `http`, `sse`)
-2. stdin이 TTY가 아니면 → `stdio` (MCP 클라이언트가 spawn한 경우)
-3. stdin이 TTY이면 → `http` (개발자가 직접 실행한 경우)
+1. `MCP_TRANSPORT` 환경변수가 있으면 해당 값 사용 (`stdio`, `http`, `sse`, `workers`)
+2. Workers 환경 감지 (globalThis.caches 존재, process.stdin 없음) → `workers`
+3. stdin이 TTY가 아니면 → `stdio` (MCP 클라이언트가 spawn한 경우)
+4. stdin이 TTY이면 → `http` (개발자가 직접 실행한 경우)
 
 ```bash
 # 환경변수로 강제 지정
@@ -104,7 +157,7 @@ node dist/index.js
 
 ```typescript
 interface TransportConfig {
-  type?: 'stdio' | 'sse' | 'http' | 'auto';  // 기본: 'auto'
+  type?: 'stdio' | 'sse' | 'http' | 'workers' | 'auto';  // 기본: 'auto'
   port?: number;                               // HTTP/SSE 포트
   host?: string;                               // 기본: 'localhost'
   basePath?: string;                           // 기본: '/'
@@ -137,6 +190,7 @@ defineServer({ transport: { type: 'sse' } });  // → 3100
 | `stdio` | 로컬 도구, Claude Desktop 직접 연결 | Claude Desktop, `mcp-cli` |
 | `sse` | 원격 서버, 기존 MCP 인프라, `mcp-proxy` 호환 | Cursor, VS Code, `mcp-proxy` |
 | `http` | 새 배포, Streamable HTTP 스펙, 리버스 프록시 뒤 | 최신 MCP 클라이언트 |
+| `workers` | Cloudflare Workers 엣지 배포, 서버리스 | PlayMCP, 원격 URL 기반 MCP 클라이언트 |
 
 ::: tip
 리버스 프록시(Nginx, Cloudflare) 뒤에 배포할 때는 `http` 트랜스포트를 사용하세요. SSE는 장기 연결(`proxy_read_timeout 86400`)을 위한 별도 프록시 설정이 필요합니다.

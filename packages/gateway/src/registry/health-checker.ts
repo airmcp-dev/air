@@ -8,32 +8,42 @@ import { ServerRegistry } from './server-registry.js';
 
 export class HealthChecker {
   private interval: ReturnType<typeof setInterval> | null = null;
+  private initialDelayTimer: ReturnType<typeof setTimeout> | null = null;
   private results = new Map<string, HealthCheckResult>();
 
   constructor(
     private registry: ServerRegistry,
     private checkIntervalMs: number = 30_000,
     private timeoutMs: number = 5_000,
+    private initialDelayMs: number = 10_000,
   ) {}
 
   /**
    * 주기적 헬스체크를 시작한다.
+   * 콜드 스타트를 고려하여 initialDelayMs 후 첫 체크를 수행한다.
    */
   start(): void {
     if (this.interval) return;
 
-    // 즉시 1회 실행
-    this.checkAll();
-
-    this.interval = setInterval(() => {
+    // 콜드 스타트 대응: initialDelayMs 후 첫 체크, 이후 주기적 실행
+    this.initialDelayTimer = setTimeout(() => {
+      this.initialDelayTimer = null;
       this.checkAll();
-    }, this.checkIntervalMs);
+
+      this.interval = setInterval(() => {
+        this.checkAll();
+      }, this.checkIntervalMs);
+    }, this.initialDelayMs);
   }
 
   /**
    * 헬스체크를 중지한다.
    */
   stop(): void {
+    if (this.initialDelayTimer) {
+      clearTimeout(this.initialDelayTimer);
+      this.initialDelayTimer = null;
+    }
     if (this.interval) {
       clearInterval(this.interval);
       this.interval = null;
@@ -41,19 +51,19 @@ export class HealthChecker {
   }
 
   /**
-   * 모든 connected 서버를 체크한다.
+   * 모든 connected 서버를 병렬로 체크한다.
    */
   async checkAll(): Promise<HealthCheckResult[]> {
     const servers = this.registry.listAll();
-    const results: HealthCheckResult[] = [];
+    const targets = servers.filter(s => s.status !== 'stopped');
 
-    for (const server of servers) {
-      if (server.status === 'stopped') continue;
-      const result = await this.checkOne(server);
-      results.push(result);
-    }
+    const settled = await Promise.allSettled(
+      targets.map(server => this.checkOne(server)),
+    );
 
-    return results;
+    return settled
+      .filter((r): r is PromiseFulfilledResult<HealthCheckResult> => r.status === 'fulfilled')
+      .map(r => r.value);
   }
 
   /**

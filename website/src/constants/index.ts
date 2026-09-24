@@ -4,7 +4,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'nav.docs', path: 'https://docs.airmcp.dev', external: true },
   { key: 'nav.enterprise', path: '/enterprise' },
   { key: 'nav.foundation', path: '/foundation' },
-  { key: 'nav.community', path: 'https://github.com/airmcp-dev/air/discussions', external: true },
+  { key: 'nav.issues', path: '/issues' },
   { key: 'nav.support', path: '/support' },
 ];
 
@@ -30,9 +30,8 @@ export const FOOTER_SECTIONS: FooterSection[] = [
   {
     titleKey: 'footer.community',
     links: [
-      { labelKey: 'footer.github', href: 'https://github.com/airmcp-dev/air', external: true },
-      { labelKey: 'footer.discussions', href: 'https://github.com/airmcp-dev/air/discussions', external: true },
-      { labelKey: 'footer.contributing', href: 'https://github.com/airmcp-dev/air/blob/main/CONTRIBUTING.md', external: true },
+      { labelKey: 'footer.npm', href: 'https://www.npmjs.com/org/airmcp-dev', external: true },
+      { labelKey: 'footer.contact', href: 'mailto:labs@codepedia.kr', external: true },
     ],
   },
   {

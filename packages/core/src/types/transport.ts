@@ -1,6 +1,6 @@
 // @airmcp-dev/core — types/transport.ts
 
-export type TransportType = 'stdio' | 'http' | 'sse' | 'auto';
+export type TransportType = 'stdio' | 'http' | 'sse' | 'workers' | 'auto';
 
 export interface TransportConfig {
   /** transport 타입 (기본: auto → 환경에 따라 stdio 또는 http) */

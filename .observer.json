@@ -1,0 +1,11 @@
+{
+  "name": "air — MCP Server Framework",
+  "description": "MCP 서버를 쉽게 만들 수 있는 TypeScript 프레임워크. defineServer/defineTool 패턴, 19개 내장 플러그인, 7개 npm 패키지 monorepo 구조.",
+  "stack": ["TypeScript", "Node.js", "Vitest", "Vite", "React", "VitePress", "Cloudflare Pages"],
+  "category": "product",
+  "status": "active",
+  "tags": ["MCP", "Framework", "TypeScript", "Plugin", "CLI", "npm", "Apache-2.0", "오픈소스"],
+  "notes": "website: airmcp.dev (Cloudflare Pages), docs: docs.airmcp.dev (VitePress), npm: @airmcp-dev/core v0.2.0",
+  "created": "2026-04-16",
+  "author": "observer-auto"
+}

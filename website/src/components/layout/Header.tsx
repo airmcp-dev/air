@@ -2,7 +2,7 @@ import { type FC, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useLanguage } from '@/hooks';
 import { LanguageToggle, Logo } from '@/components/common';
-import { NAV_ITEMS, GITHUB_URL } from '@/constants';
+import { NAV_ITEMS } from '@/constants';
 
 const Header: FC = () => {
   const { t } = useLanguage();
@@ -40,9 +40,9 @@ const Header: FC = () => {
           </nav>
           <div className="hidden md:flex items-center gap-4">
             <LanguageToggle />
-            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer"
-               className="text-text-muted hover:text-text-primary transition-colors duration-300" aria-label="GitHub">
-              <i className="fa-brands fa-github text-lg" />
+            <a href="https://www.npmjs.com/org/airmcp-dev" target="_blank" rel="noopener noreferrer"
+               className="text-text-muted hover:text-text-primary transition-colors duration-300" aria-label="npm">
+              <i className="fa-brands fa-npm text-lg" />
             </a>
           </div>
           <button className="md:hidden p-2 text-text-secondary" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle menu">
@@ -61,8 +61,8 @@ const Header: FC = () => {
             )}
             <div className="pt-3 px-4 flex items-center gap-4">
               <LanguageToggle />
-              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-text-primary transition-colors">
-                <i className="fa-brands fa-github text-lg" />
+              <a href="https://www.npmjs.com/org/airmcp-dev" target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-text-primary transition-colors">
+                <i className="fa-brands fa-npm text-lg" />
               </a>
             </div>
           </nav>

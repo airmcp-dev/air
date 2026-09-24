@@ -73,6 +73,58 @@ defineServer({
 
 Each session gets a unique ID via `crypto.randomUUID()`.
 
+## Cloudflare Workers
+
+Edge deployment transport. No Node.js http server — instead, air exposes a `fetch()` handler compatible with the Workers runtime. MCP protocol is handled as JSON-RPC 2.0 directly (no SDK dependency needed at runtime).
+
+```typescript
+import { defineServer, defineTool } from '@airmcp-dev/core';
+
+const server = defineServer({
+  name: 'my-edge-server',
+  transport: { type: 'workers' },
+  tools: [
+    defineTool('hello', {
+      params: { name: 'string' },
+      handler: async ({ name }) => `Hello, ${name}!`,
+    }),
+  ],
+});
+
+export default {
+  async fetch(request: Request, env: any): Promise<Response> {
+    const url = new URL(request.url);
+
+    // MCP endpoint
+    if (request.method === 'POST' && url.pathname === '/') {
+      return server.fetch!(request);
+    }
+
+    // Status
+    if (request.method === 'GET' && url.pathname === '/') {
+      return Response.json(server.status());
+    }
+
+    return new Response('Not Found', { status: 404 });
+  },
+};
+```
+
+`server.fetch` handles:
+- `initialize` → server info + capabilities
+- `tools/list` → tool schemas with annotations
+- `tools/call` → executes through the full middleware chain
+- `resources/list`, `prompts/list` → if registered
+- `notifications/initialized` → 204 No Content
+
+::: tip
+Workers transport doesn't call `server.start()`. The server is ready immediately — just call `server.fetch(request)` in your Workers fetch handler.
+:::
+
+::: warning
+`stdio` and `sse` transports are not available in Workers. Only `workers` (and `http` for Node.js) support the Streamable HTTP protocol.
+:::
+
 ## auto (default)
 
 Omit `type` or set `'auto'` to auto-detect based on environment:
@@ -85,9 +137,10 @@ defineServer({
 
 Detection order:
 
-1. `MCP_TRANSPORT` env variable overrides everything (`stdio`, `http`, `sse`)
-2. stdin is not TTY → `stdio` (MCP client spawned the process)
-3. stdin is TTY → `http` (developer running directly)
+1. `MCP_TRANSPORT` env variable overrides everything (`stdio`, `http`, `sse`, `workers`)
+2. Workers environment detected (globalThis.caches exists, no process.stdin) → `workers`
+3. stdin is not TTY → `stdio` (MCP client spawned the process)
+4. stdin is TTY → `http` (developer running directly)
 
 ```bash
 # Force via env variable
@@ -104,7 +157,7 @@ node dist/index.js
 
 ```typescript
 interface TransportConfig {
-  type?: 'stdio' | 'sse' | 'http' | 'auto';  // Default: 'auto'
+  type?: 'stdio' | 'sse' | 'http' | 'workers' | 'auto';  // Default: 'auto'
   port?: number;                               // HTTP/SSE port
   host?: string;                               // Default: 'localhost'
   basePath?: string;                           // Default: '/'
@@ -137,6 +190,7 @@ defineServer({ transport: { type: 'sse' } });  // → 3100
 | `stdio` | Local tools, Claude Desktop direct | Claude Desktop, `mcp-cli` |
 | `sse` | Remote servers, existing MCP infra, `mcp-proxy` compat | Cursor, VS Code, `mcp-proxy` |
 | `http` | New deployments, Streamable HTTP spec, behind reverse proxy | Latest MCP clients |
+| `workers` | Cloudflare Workers edge deployment, serverless | PlayMCP, any MCP client via remote URL |
 
 ::: tip
 When deploying behind a reverse proxy (Nginx, Cloudflare), use `http` transport. SSE requires special proxy config for long-lived connections (`proxy_read_timeout 86400`).

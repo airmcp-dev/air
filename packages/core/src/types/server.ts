@@ -25,7 +25,7 @@ export interface AirServerOptions extends AirConfig {
 export interface AirServer {
   /** 서버 이름 */
   readonly name: string;
-  /** 서버 시작 */
+  /** 서버 시작 (stdio/http/sse용) */
   start(): Promise<void>;
   /** 서버 종료 */
   stop(): Promise<void>;
@@ -45,6 +45,8 @@ export interface AirServer {
   addPlugin(plugin: AirPlugin | AirPluginFactory): void;
   /** 글로벌 상태 */
   state: Record<string, any>;
+  /** Workers fetch 핸들러 (transport: 'workers'일 때 사용) */
+  fetch?: (request: Request, env?: any) => Promise<Response>;
 }
 
 export interface AirServerStatus {

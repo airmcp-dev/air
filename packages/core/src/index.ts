@@ -36,6 +36,8 @@ export { DEFAULT_CONFIG } from './config/index.js';
 
 // ── Transport ──
 export { detectTransport } from './transport/index.js';
+export { createWorkersFetchHandler } from './transport/index.js';
+export type { WorkersTransportConfig } from './transport/index.js';
 
 // ── 컨텍스트 ──
 export { createRequestContext } from './context/index.js';

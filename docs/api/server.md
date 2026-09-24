@@ -65,6 +65,9 @@ interface AirServer {
   addPlugin(plugin: AirPlugin): void;
 
   state: Record<string, any>;
+
+  /** Workers fetch handler — available when transport is 'workers' */
+  fetch?: (request: Request, env?: any) => Promise<Response>;
 }
 ```
 
@@ -136,6 +139,39 @@ Shared object accessible from all handlers via `context.state`.
 server.state.db = myConnection;
 // In handler: context.state.db.query(...)
 ```
+
+#### server.fetch(request, env?)
+
+Workers-only. Handles MCP JSON-RPC requests through the full middleware chain. Available regardless of transport type, but primarily used with `transport: { type: 'workers' }`.
+
+```typescript
+const server = defineServer({
+  transport: { type: 'workers' },
+  tools: [ /* ... */ ],
+});
+
+// In Workers fetch handler
+export default {
+  async fetch(request: Request, env: Env) {
+    if (request.method === 'POST') {
+      return server.fetch!(request);
+    }
+    return Response.json(server.status());
+  },
+};
+```
+
+Handles these JSON-RPC methods:
+- `initialize` → server info + capabilities
+- `tools/list` → registered tool schemas
+- `tools/call` → tool execution through middleware chain
+- `resources/list` → registered resources
+- `prompts/list` → registered prompts
+- `notifications/initialized` → 204 No Content
+
+::: tip
+`server.fetch` is always defined (not just for workers transport), so you can use it for testing or custom HTTP integrations on any platform.
+:::
 
 ## onShutdown(handler)
 

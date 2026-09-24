@@ -72,6 +72,18 @@ export interface AirConfig {
   /** SSE 최대 동시 세션 수 (기본: 200, 초과 시 503) */
   maxSseSessions?: number;
 
+  /** SSE 세션 idle timeout ms (기본: 600000 = 10분, 초과 시 자동 종료) */
+  sseIdleTimeoutMs?: number;
+
+  /** SSE 하트비트 간격 ms (기본: 30000, 0이면 비활성) */
+  sseHeartbeatMs?: number;
+
+  /** SSE 재전송 버퍼 크기 — 최근 N개 메시지 보관 (기본: 100) */
+  sseReplayBufferSize?: number;
+
+  /** SSE 재전송 버퍼 TTL ms — 이 시간 지난 메시지 폐기 (기본: 300000 = 5분) */
+  sseReplayTtlMs?: number;
+
   /** 스토리지 설정 (기본: memory) */
   storage?: StoreOptions;
 

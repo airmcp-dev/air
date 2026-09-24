@@ -179,6 +179,7 @@ const result = await server.callTool(toolCall.function.name, toolCall.function.a
 transport: { type: 'stdio' }             // Claude Desktop (기본)
 transport: { type: 'sse', port: 3510 }   // 원격 SSE
 transport: { type: 'http', port: 3510 }  // Streamable HTTP
+transport: { type: 'workers' }           // Cloudflare Workers (엣지)
 ```
 
 ## 스토리지

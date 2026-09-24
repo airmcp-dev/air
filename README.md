@@ -224,6 +224,7 @@ use: [
 transport: { type: 'stdio' }             // Claude Desktop (default)
 transport: { type: 'sse', port: 3510 }   // Remote SSE
 transport: { type: 'http', port: 3510 }  // Streamable HTTP
+transport: { type: 'workers' }           // Cloudflare Workers (edge)
 ```
 
 Auto-detection: piped stdin → stdio, terminal → http.

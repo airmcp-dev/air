@@ -9,7 +9,7 @@ air is a TypeScript framework for building MCP (Model Context Protocol) servers.
 
 - **Packages**: `@airmcp-dev/core`, `@airmcp-dev/cli`, `@airmcp-dev/gateway`, `@airmcp-dev/logger`, `@airmcp-dev/meter`
 - **Runtime**: Node.js 18+, TypeScript ESM
-- **MCP SDK**: Uses `@modelcontextprotocol/sdk ^1.12.0` internally
+- **MCP SDK**: Uses `@modelcontextprotocol/sdk ^1.29.0` internally
 - **License**: Apache-2.0
 
 ## Core API
@@ -23,7 +23,7 @@ const server = defineServer({
   name: 'my-server',              // Required
   version: '1.0.0',               // Default: '0.1.0'
   description: 'Server description',
-  transport: { type: 'sse', port: 3510 },  // 'stdio' | 'sse' | 'http' | 'auto'
+  transport: { type: 'sse', port: 3510 },  // 'stdio' | 'sse' | 'http' | 'workers' | 'auto'
   storage: { type: 'file', path: '.air/data' },  // 'memory' | 'file'
   logging: { level: 'info', format: 'json' },
   meter: { classify: true, trackCalls: true },
@@ -35,6 +35,25 @@ const server = defineServer({
 });
 
 server.start();
+```
+
+### Workers Transport (Cloudflare Workers)
+
+```typescript
+const server = defineServer({
+  transport: { type: 'workers' },
+  tools: [ /* ... */ ],
+});
+
+export default {
+  async fetch(request: Request, env: any): Promise<Response> {
+    if (request.method === 'POST' && new URL(request.url).pathname === '/') {
+      return server.fetch!(request);  // MCP JSON-RPC handler
+    }
+    return Response.json(server.status());
+  },
+};
+// No server.start() needed. server.fetch handles initialize, tools/list, tools/call.
 ```
 
 ### defineTool
@@ -258,3 +277,4 @@ function myPlugin(options?: MyOptions): AirPlugin {
 - `authPlugin`'s `_auth` param must be defined in tool params for MCP client passthrough
 - `fallbackPlugin` maps tool names, not values: `{ 'primary': 'backup' }`
 - `queuePlugin`'s `concurrency` is a map: `{ 'db': 3, '*': 10 }`
+- Workers transport: no `server.start()`, no filesystem, no stdio/SSE. Use `server.fetch!(request)` and D1/KV for storage

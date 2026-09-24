@@ -1,0 +1,92 @@
+[
+  {
+    "id": "AIR-001",
+    "title": { "en": "Package exports pointing to src instead of dist", "ko": "패키지 exports가 dist 대신 src를 가리킴" },
+    "description": { "en": "All 5 npm packages had exports pointing to ./src/index.ts instead of ./dist paths, causing import failures for npm consumers who don't have the TypeScript source.", "ko": "5개 npm 패키지의 exports가 ./dist 대신 ./src/index.ts를 가리켜서 TypeScript 소스가 없는 npm 사용자에게 import 실패를 유발하던 문제." },
+    "status": "resolved",
+    "priority": "critical",
+    "package": "@airmcp-dev/core",
+    "reportedAt": "2026-04-10",
+    "resolvedAt": "2026-04-11"
+  },
+  {
+    "id": "AIR-002",
+    "title": { "en": "SSE mode not registering resources/prompts to session servers", "ko": "SSE 모드에서 리소스/프롬프트가 세션 서버에 등록되지 않음" },
+    "description": { "en": "In SSE transport, resources and prompts defined in defineServer were not being forwarded to per-session McpServer instances. Only tools were registered.", "ko": "SSE 트랜스포트에서 defineServer에 정의된 리소스와 프롬프트가 세션별 McpServer 인스턴스에 전달되지 않았습니다. 도구만 등록되던 문제." },
+    "status": "resolved",
+    "priority": "high",
+    "package": "@airmcp-dev/core",
+    "reportedAt": "2026-04-11",
+    "resolvedAt": "2026-04-12"
+  },
+  {
+    "id": "AIR-003",
+    "title": { "en": "FileStore append performance O(n²) on large logs", "ko": "FileStore append가 대용량 로그에서 O(n²) 성능" },
+    "description": { "en": "FileStore.append() was reading the entire file on each append, causing quadratic slowdown on large log files. Fixed by switching to fs.appendFile.", "ko": "FileStore.append()가 매 append마다 전체 파일을 읽어서 대용량 로그 파일에서 성능이 제곱으로 느려지는 문제. fs.appendFile로 전환하여 수정." },
+    "status": "resolved",
+    "priority": "high",
+    "package": "@airmcp-dev/core",
+    "reportedAt": "2026-04-14",
+    "resolvedAt": "2026-04-15"
+  },
+  {
+    "id": "AIR-004",
+    "title": { "en": "retryPlugin not passing server state on internal retries", "ko": "retryPlugin 내부 재시도 시 서버 state 미전달" },
+    "description": { "en": "When retryPlugin triggered an internal retry, the server state object was not passed through to the retried handler call, causing state-dependent tools to fail silently.", "ko": "retryPlugin이 내부 재시도를 실행할 때, 서버 state 객체가 재시도된 핸들러 호출에 전달되지 않아 state 의존 도구가 조용히 실패하는 문제." },
+    "status": "resolved",
+    "priority": "high",
+    "package": "@airmcp-dev/core",
+    "reportedAt": "2026-04-18",
+    "resolvedAt": "2026-04-20"
+  },
+  {
+    "id": "AIR-005",
+    "title": { "en": "queuePlugin setTimeout leak on release", "ko": "queuePlugin release 시 setTimeout 누적" },
+    "description": { "en": "queuePlugin was not clearing setTimeout handles when releasing queue slots, causing timer accumulation under sustained load.", "ko": "queuePlugin이 큐 슬롯을 해제할 때 setTimeout 핸들을 정리하지 않아 지속적인 부하에서 타이머가 누적되는 문제." },
+    "status": "resolved",
+    "priority": "normal",
+    "package": "@airmcp-dev/core",
+    "reportedAt": "2026-04-22",
+    "resolvedAt": "2026-04-24"
+  },
+  {
+    "id": "AIR-006",
+    "title": { "en": "Shield rate limit windows not isolated per server instance", "ko": "Shield 레이트리밋 윈도우가 서버 인스턴스별로 격리되지 않음" },
+    "description": { "en": "When running multiple defineServer instances in the same process, Shield's rate limit counters were shared globally instead of per-instance. Fixed by moving state into closure.", "ko": "같은 프로세스에서 여러 defineServer 인스턴스를 실행할 때, Shield의 레이트리밋 카운터가 인스턴스별이 아닌 전역으로 공유되던 문제. 클로저 내부로 상태를 이동하여 수정." },
+    "status": "resolved",
+    "priority": "high",
+    "package": "@airmcp-dev/core",
+    "reportedAt": "2026-05-03",
+    "resolvedAt": "2026-05-08"
+  },
+  {
+    "id": "AIR-007",
+    "title": { "en": "CLI connect fails on Windows backslash paths", "ko": "CLI connect가 Windows 백슬래시 경로에서 실패" },
+    "description": { "en": "The connect command generated invalid JSON in claude_desktop_config.json on Windows due to unescaped backslash paths. Fixed by normalizing to forward slashes.", "ko": "connect 명령어가 Windows에서 백슬래시 경로를 이스케이프하지 않아 claude_desktop_config.json에 잘못된 JSON을 생성하던 문제. 슬래시 정규화로 수정." },
+    "status": "resolved",
+    "priority": "normal",
+    "package": "@airmcp-dev/cli",
+    "reportedAt": "2026-05-20",
+    "resolvedAt": "2026-05-25"
+  },
+  {
+    "id": "AIR-008",
+    "title": { "en": "Workers transport: resources/read not implemented", "ko": "Workers 트랜스포트: resources/read 미구현" },
+    "description": { "en": "The Cloudflare Workers transport handler supports tools/list, tools/call, resources/list, and prompts/list but does not implement resources/read or prompts/get yet.", "ko": "Cloudflare Workers 트랜스포트 핸들러가 tools/list, tools/call, resources/list, prompts/list은 지원하지만 resources/read와 prompts/get은 아직 미구현." },
+    "status": "resolved",
+    "priority": "normal",
+    "package": "@airmcp-dev/core",
+    "reportedAt": "2026-06-18",
+    "resolvedAt": "2026-09-25"
+  },
+  {
+    "id": "AIR-009",
+    "title": { "en": "Gateway health check too aggressive on cold start", "ko": "Gateway 헬스체크가 콜드 스타트 시 과도하게 빠름" },
+    "description": { "en": "When a backend server is cold-starting, the gateway marks it as unhealthy before initialization completes. Workaround: increase healthCheck.initialDelayMs.", "ko": "백엔드 서버가 콜드 스타트 중일 때, 초기화 완료 전에 게이트웨이가 비정상으로 표시합니다. 임시 해결: healthCheck.initialDelayMs를 늘리세요." },
+    "status": "resolved",
+    "priority": "high",
+    "package": "@airmcp-dev/gateway",
+    "reportedAt": "2026-07-08",
+    "resolvedAt": "2026-09-25"
+  }
+]

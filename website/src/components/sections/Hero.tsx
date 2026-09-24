@@ -1,7 +1,7 @@
 import { type FC, useState } from 'react';
 import { useLanguage } from '@/hooks';
 import { AsciiCube } from '@/components/common';
-import { GITHUB_URL } from '@/constants';
+
 import { copyToClipboard } from '@/utils';
 
 const Hero: FC = () => {
@@ -50,9 +50,9 @@ const Hero: FC = () => {
                 <i className="fa-solid fa-arrow-right text-xs" />
                 {t('hero.cta.getStarted')}
               </a>
-              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="btn-secondary">
-                <i className="fa-brands fa-github" />
-                {t('hero.cta.viewGithub')}
+              <a href="https://docs.airmcp.dev" className="btn-secondary">
+                <i className="fa-solid fa-book" />
+                {t('hero.cta.viewDocs')}
               </a>
             </div>
             {/* npm command */}

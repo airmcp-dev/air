@@ -65,6 +65,9 @@ interface AirServer {
   addPlugin(plugin: AirPlugin): void;
 
   state: Record<string, any>;
+
+  /** Workers fetch 핸들러 (transport: 'workers'일 때 사용) */
+  fetch?: (request: Request, env?: any) => Promise<Response>;
 }
 ```
 
@@ -105,7 +108,7 @@ interface AirServerStatus {
   uptime: number;           // ms
   toolCount: number;
   resourceCount: number;
-  transport: string;        // 'stdio' | 'sse' | 'http'
+  transport: string;        // 'stdio' | 'sse' | 'http' | 'workers'
 }
 ```
 
@@ -146,6 +149,39 @@ server.state.db = myConnection;
 // 핸들러에서
 handler: async (params, context) => context.state.db.query(params.sql)
 ```
+
+#### server.fetch(request, env?)
+
+Workers 전용. MCP JSON-RPC 요청을 미들웨어 체인을 거쳐 처리합니다. 모든 transport 타입에서 정의되지만, 주로 `transport: { type: 'workers' }`에서 사용합니다.
+
+```typescript
+const server = defineServer({
+  transport: { type: 'workers' },
+  tools: [ /* ... */ ],
+});
+
+// Workers fetch 핸들러에서
+export default {
+  async fetch(request: Request, env: Env) {
+    if (request.method === 'POST') {
+      return server.fetch!(request);
+    }
+    return Response.json(server.status());
+  },
+};
+```
+
+처리하는 JSON-RPC 메서드:
+- `initialize` → 서버 정보 + capabilities
+- `tools/list` → 등록된 도구 스키마
+- `tools/call` → 미들웨어 체인을 거친 도구 실행
+- `resources/list` → 등록된 리소스
+- `prompts/list` → 등록된 프롬프트
+- `notifications/initialized` → 204 No Content
+
+::: tip
+`server.fetch`는 workers transport뿐 아니라 항상 정의됩니다. 테스트나 커스텀 HTTP 통합에서도 활용 가능합니다.
+:::
 
 ## onShutdown(handler)
 

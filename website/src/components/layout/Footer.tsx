@@ -2,7 +2,7 @@ import { type FC } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/hooks';
 import { Logo } from '@/components/common';
-import { FOOTER_SECTIONS, LABS_URL, GITHUB_URL } from '@/constants';
+import { FOOTER_SECTIONS, LABS_URL } from '@/constants';
 
 const Footer: FC = () => {
   const { t } = useLanguage();
@@ -18,8 +18,8 @@ const Footer: FC = () => {
             </Link>
             <p className="text-text-muted text-sm leading-relaxed mb-5">Build, run, and manage<br />MCP servers.</p>
             <div className="flex items-center gap-4 mb-4">
-              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-air-400 transition-colors"><i className="fa-brands fa-github text-base" /></a>
               <a href="https://www.npmjs.com/org/airmcp-dev" target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-air-400 transition-colors"><i className="fa-brands fa-npm text-base" /></a>
+              <a href="mailto:labs@codepedia.kr" className="text-text-muted hover:text-air-400 transition-colors"><i className="fa-solid fa-envelope text-base" /></a>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-text-muted">
               <span>{t('footer.builtBy')}</span>
