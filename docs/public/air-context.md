@@ -66,7 +66,7 @@ export default {
 };
 ```
 
-`server.fetch` handles MCP JSON-RPC: `initialize`, `tools/list`, `tools/call`, `resources/list`, `prompts/list`.
+`server.fetch` handles MCP JSON-RPC: `initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`, `prompts/list`, `prompts/get`.
 
 ### defineTool
 

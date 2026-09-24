@@ -33,6 +33,12 @@ interface AirServerOptions {
   storage?: StoreOptions;
   meter?: MeterConfig;
 
+  maxSseSessions?: number;                // 기본: 200 — 최대 동시 SSE 세션 수
+  sseHeartbeatMs?: number;                // 기본: 30000 — 하트비트 ping 간격 (0이면 비활성)
+  sseReplayBufferSize?: number;           // 기본: 100 — 재연결용 메시지 보관 수
+  sseReplayTtlMs?: number;               // 기본: 300000 — 재전송 버퍼 TTL
+  sseIdleTimeoutMs?: number;             // 기본: 600000 — 유휴 세션 자동 종료
+
   logging?: {
     level?: 'debug' | 'info' | 'warn' | 'error' | 'silent';  // 기본: 'info'
     format?: 'json' | 'pretty';                                // 기본: 'pretty'
@@ -172,11 +178,13 @@ export default {
 ```
 
 처리하는 JSON-RPC 메서드:
-- `initialize` → 서버 정보 + capabilities
+- `initialize` → 서버 정보 + capabilities (tools, resources, prompts)
 - `tools/list` → 등록된 도구 스키마
 - `tools/call` → 미들웨어 체인을 거친 도구 실행
 - `resources/list` → 등록된 리소스
+- `resources/read` → URI로 리소스 내용 읽기 (v0.4.0+)
 - `prompts/list` → 등록된 프롬프트
+- `prompts/get` → 이름으로 프롬프트 메시지 조회 (v0.4.0+)
 - `notifications/initialized` → 204 No Content
 
 ::: tip

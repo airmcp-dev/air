@@ -33,6 +33,12 @@ interface AirServerOptions {
   storage?: StoreOptions;
   meter?: MeterConfig;
 
+  maxSseSessions?: number;                // Default: 200 — max concurrent SSE sessions
+  sseHeartbeatMs?: number;                // Default: 30000 — ping interval (0 to disable)
+  sseReplayBufferSize?: number;           // Default: 100 — messages kept for reconnection
+  sseReplayTtlMs?: number;               // Default: 300000 — replay buffer TTL
+  sseIdleTimeoutMs?: number;             // Default: 600000 — auto-close idle sessions
+
   logging?: {
     level?: 'debug' | 'info' | 'warn' | 'error' | 'silent';
     format?: 'json' | 'pretty';
@@ -162,11 +168,13 @@ export default {
 ```
 
 Handles these JSON-RPC methods:
-- `initialize` → server info + capabilities
+- `initialize` → server info + capabilities (tools, resources, prompts)
 - `tools/list` → registered tool schemas
 - `tools/call` → tool execution through middleware chain
 - `resources/list` → registered resources
+- `resources/read` → read resource content by URI (v0.4.0+)
 - `prompts/list` → registered prompts
+- `prompts/get` → get prompt messages by name (v0.4.0+)
 - `notifications/initialized` → 204 No Content
 
 ::: tip

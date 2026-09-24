@@ -23,6 +23,8 @@ interface GatewayConfig {
   name?: string;
   port?: number;
   healthCheckInterval?: number;   // ms, 기본: 15000
+  healthCheckTimeout?: number;    // ms, 기본: 5000
+  initialDelayMs?: number;        // ms, 기본: 10000 (v0.4.0+)
   balancer?: BalancerStrategy;    // 기본: 'round-robin'
   requestTimeout?: number;        // ms
 }

@@ -31,6 +31,12 @@ interface AirConfig {
   storage?: StoreOptions;
   meter?: MeterConfig;
 
+  maxSseSessions?: number;          // Default: 200
+  sseHeartbeatMs?: number;          // Default: 30000 (0 to disable)
+  sseReplayBufferSize?: number;     // Default: 100
+  sseReplayTtlMs?: number;         // Default: 300000
+  sseIdleTimeoutMs?: number;       // Default: 600000
+
   logging?: {
     level?: 'debug' | 'info' | 'warn' | 'error' | 'silent';
     format?: 'json' | 'pretty';

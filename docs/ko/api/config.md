@@ -31,6 +31,12 @@ interface AirConfig {
   storage?: StoreOptions;
   meter?: MeterConfig;
 
+  maxSseSessions?: number;          // 기본: 200
+  sseHeartbeatMs?: number;          // 기본: 30000 (0이면 비활성)
+  sseReplayBufferSize?: number;     // 기본: 100
+  sseReplayTtlMs?: number;         // 기본: 300000
+  sseIdleTimeoutMs?: number;       // 기본: 600000
+
   logging?: {
     level?: 'debug' | 'info' | 'warn' | 'error' | 'silent';
     format?: 'json' | 'pretty';
