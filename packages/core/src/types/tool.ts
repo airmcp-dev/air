@@ -46,6 +46,34 @@ export interface AirElicitResult {
   content?: Record<string, any>;
 }
 
+/** MRTR Input Request — 서버가 클라이언트에 추가 입력을 요청할 때 */
+export interface AirInputRequest {
+  /** 입력 요청 타입 */
+  type: 'elicitation';
+  /** 사용자에게 보여줄 메시지 */
+  message: string;
+  /** 요청할 데이터 스키마 */
+  requestedSchema: {
+    type: 'object';
+    properties: Record<string, { type: string; description?: string }>;
+    required?: string[];
+  };
+}
+
+/** MRTR Input Response — 클라이언트가 서버에 입력을 보낼 때 */
+export interface AirInputResponse {
+  type: 'elicitation';
+  action: 'accept' | 'decline' | 'cancel';
+  content?: Record<string, any>;
+}
+
+/** MRTR을 위한 InputRequired 결과 */
+export interface AirInputRequiredResult {
+  _inputRequired: true;
+  inputRequests: AirInputRequest[];
+  requestState?: string;
+}
+
 /** 도구 호출 시 전달되는 컨텍스트 */
 export interface AirToolContext {
   /** 요청 고유 ID */
@@ -63,6 +91,30 @@ export interface AirToolContext {
    * 클라이언트가 elicitation을 지원하지 않으면 undefined
    */
   elicit?: (message: string, schema: AirElicitSchema) => Promise<AirElicitResult>;
+  /**
+   * MRTR: 클라이언트가 보낸 inputResponses (재시도 요청 시)
+   * 첫 요청에서는 undefined, inputRequired 후 재요청 시 값이 들어옴
+   */
+  inputResponses?: AirInputResponse[];
+  /**
+   * MRTR: 추가 입력을 요청하는 헬퍼.
+   * 이 함수의 반환값을 handler에서 그대로 return하면 된다.
+   *
+   * @example
+   *   handler: async (params, ctx) => {
+   *     if (!params.confirmed) {
+   *       return ctx.requestInput('Confirm this action?', {
+   *         confirmed: { type: 'boolean', description: 'Confirm?' },
+   *       });
+   *     }
+   *     return 'Done';
+   *   }
+   */
+  requestInput: (
+    message: string,
+    schema: Record<string, { type: string; description?: string }>,
+    requestState?: string,
+  ) => AirInputRequiredResult;
 }
 
 /** 도구 응답 (자동으로 MCP content 형식으로 변환됨) */
@@ -75,7 +127,8 @@ export type AirToolResponse =
   | { text: string }
   | { image: string; mimeType?: string }
   | { resource: AirResourceLink }
-  | { content: Array<{ type: string; text?: string; data?: string; mimeType?: string; uri?: string; name?: string }> };
+  | { content: Array<{ type: string; text?: string; data?: string; mimeType?: string; uri?: string; name?: string }> }
+  | AirInputRequiredResult;
 
 /** 리소스 링크 — MCP 2025-06-18 Resource Links */
 export interface AirResourceLink {

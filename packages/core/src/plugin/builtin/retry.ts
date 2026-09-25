@@ -52,6 +52,11 @@ export function retryPlugin(options?: RetryOptions): AirPlugin {
             serverName: ctx.serverName,
             startedAt: ctx.startedAt,
             state: ctx.meta._serverState || {},
+            requestInput: (msg: string, schema: any, rs?: string) => ({
+              _inputRequired: true as const,
+              inputRequests: [{ type: 'elicitation' as const, message: msg, requestedSchema: { type: 'object' as const, properties: schema } }],
+              ...(rs ? { requestState: rs } : {}),
+            }),
           });
           return result; // 성공 시 즉시 반환
         } catch (retryError) {

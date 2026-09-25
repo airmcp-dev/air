@@ -40,10 +40,12 @@ export class ServerRunner {
       tools: this.tools,
       resources: this.resources,
       prompts: this.prompts,
-      callTool: async (toolName, params) => {
+      callTool: async (toolName, params, meta, inputResponses) => {
         const tool = this.tools.find(t => t.name === toolName);
         if (!tool) throw new Error(`Tool not found: ${toolName}`);
-        const reqCtx = createRequestContext(this.config.name, this.serverCtx.state);
+        const reqCtx = createRequestContext(this.config.name, this.serverCtx.state, {
+          inputResponses,
+        });
         return this.middlewareChain.execute(tool, params, reqCtx);
       },
     });

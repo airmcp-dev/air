@@ -86,7 +86,7 @@ export interface ProtocolEngineConfig {
   resources: AirResourceDef[];
   prompts: AirPromptDef[];
   /** 도구 실행 함수 — 미들웨어 체인을 거쳐 실행 */
-  callTool: (toolName: string, params: Record<string, any>, meta?: ClientMeta) => Promise<any>;
+  callTool: (toolName: string, params: Record<string, any>, meta?: ClientMeta, inputResponses?: any[]) => Promise<any>;
   /** 캐시 힌트 (기본: 300000ms) */
   defaultTtlMs?: number;
   /** 캐시 스코프 (기본: 'public') */
@@ -279,6 +279,8 @@ export class McpProtocolEngine {
   private async handleToolsCall(params?: Record<string, any>, meta?: ClientMeta): Promise<any> {
     const toolName = params?.name;
     const args = params?.arguments || {};
+    const inputResponses = params?.inputResponses;
+    const requestState = params?.requestState;
 
     if (!toolName) {
       throw Object.assign(new Error('Missing required param: name'), { code: ErrorCodes.INVALID_PARAMS });
@@ -289,7 +291,17 @@ export class McpProtocolEngine {
       throw Object.assign(new Error(`Tool not found: ${toolName}`), { code: ErrorCodes.METHOD_NOT_FOUND });
     }
 
-    const content = await this.config.callTool(toolName, args, meta);
+    const content = await this.config.callTool(toolName, args, meta, inputResponses);
+
+    // MRTR: handler가 _inputRequired를 반환하면 input_required 응답
+    if (content && typeof content === 'object' && '_inputRequired' in content && content._inputRequired) {
+      return {
+        resultType: 'input_required',
+        inputRequests: content.inputRequests,
+        ...(content.requestState ? { requestState: content.requestState } : {}),
+        content: [{ type: 'text', text: content.inputRequests[0]?.message || 'Additional input required' }],
+      };
+    }
 
     const result: any = { content };
 
