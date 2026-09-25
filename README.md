@@ -280,7 +280,7 @@ Full documentation: **[docs.airmcp.dev](https://docs.airmcp.dev)**
 
 ```bash
 pnpm install
-npx vitest run    # 25 files, 295 tests
+npx vitest run    # 28 files, 333 tests
 ```
 
 ## License

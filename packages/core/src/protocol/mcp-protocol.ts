@@ -95,9 +95,21 @@ export interface ProtocolEngineConfig {
 
 // ── 프로토콜 엔진 ──
 
+/** 구독 타입 */
+type SubscriptionType = 'toolsListChanged' | 'promptsListChanged' | 'resourcesListChanged' | 'resourceSubscriptions';
+
+/** 구독 정보 */
+interface Subscription {
+  id: string;
+  types: SubscriptionType[];
+  createdAt: number;
+}
+
 export class McpProtocolEngine {
   private config: ProtocolEngineConfig;
   private serverInfo: { name: string; version: string };
+  private subscriptions = new Map<string, Subscription>();
+  private subscriptionCounter = 0;
 
   constructor(config: ProtocolEngineConfig) {
     this.config = config;
@@ -165,6 +177,19 @@ export class McpProtocolEngine {
           result = { resultType: 'complete' };
           break;
 
+        // ── subscriptions (2026-07-28) ──
+        case 'subscriptions/listen':
+          result = this.handleSubscriptionsListen(params, isModern);
+          break;
+
+        // ── 레거시: resources/subscribe, resources/unsubscribe ──
+        case 'resources/subscribe':
+          result = this.handleResourcesSubscribe(params);
+          break;
+        case 'resources/unsubscribe':
+          result = this.handleResourcesUnsubscribe(params);
+          break;
+
         // ── unknown ──
         default:
           return this.error(id, ErrorCodes.METHOD_NOT_FOUND, `Method not found: ${method}`);
@@ -178,7 +203,8 @@ export class McpProtocolEngine {
 
       return this.success(id, result);
     } catch (err: any) {
-      return this.error(id, ErrorCodes.INTERNAL_ERROR, err.message || 'Internal error');
+      const code = typeof err.code === 'number' ? err.code : ErrorCodes.INTERNAL_ERROR;
+      return this.error(id, code, err.message || 'Internal error');
     }
   }
 
@@ -189,9 +215,9 @@ export class McpProtocolEngine {
       resultType: 'complete',
       supportedVersions: SUPPORTED_VERSIONS,
       capabilities: {
-        tools: { listChanged: false },
-        resources: { listChanged: false },
-        prompts: { listChanged: false },
+        tools: { listChanged: true },
+        resources: { listChanged: true },
+        prompts: { listChanged: true },
       },
       _meta: {
         'io.modelcontextprotocol/serverInfo': this.serverInfo,
@@ -210,9 +236,9 @@ export class McpProtocolEngine {
       return {
         protocolVersion: PROTOCOL_VERSIONS.LEGACY,
         capabilities: {
-          tools: { listChanged: false },
-          resources: { listChanged: false },
-          prompts: { listChanged: false },
+          tools: { listChanged: true },
+          resources: { listChanged: true },
+          prompts: { listChanged: true },
         },
         serverInfo: this.serverInfo,
         // 지원 버전을 알려줘서 클라이언트가 discover로 전환 가능
@@ -228,9 +254,9 @@ export class McpProtocolEngine {
     return {
       protocolVersion: negotiated,
       capabilities: {
-        tools: { listChanged: false },
-        resources: { listChanged: false },
-        prompts: { listChanged: false },
+        tools: { listChanged: true },
+        resources: { listChanged: true },
+        prompts: { listChanged: true },
       },
       serverInfo: this.serverInfo,
     };
@@ -432,6 +458,111 @@ export class McpProtocolEngine {
         content: { type: 'text', text: m.content },
       })),
     };
+  }
+
+  // ── subscriptions/listen (2026-07-28) ──
+
+  private handleSubscriptionsListen(params?: Record<string, any>, isModern?: boolean): any {
+    const types = params?.types as SubscriptionType[] | undefined;
+
+    if (!types || !Array.isArray(types) || types.length === 0) {
+      throw Object.assign(
+        new Error('Missing or empty "types" array'),
+        { code: ErrorCodes.INVALID_PARAMS },
+      );
+    }
+
+    // 유효한 구독 타입 체크
+    const validTypes: SubscriptionType[] = [
+      'toolsListChanged', 'promptsListChanged',
+      'resourcesListChanged', 'resourceSubscriptions',
+    ];
+    for (const t of types) {
+      if (!validTypes.includes(t)) {
+        throw Object.assign(
+          new Error(`Invalid subscription type: "${t}". Valid: ${validTypes.join(', ')}`),
+          { code: ErrorCodes.INVALID_PARAMS },
+        );
+      }
+    }
+
+    // 구독 등록
+    const subId = `sub_${++this.subscriptionCounter}_${Date.now()}`;
+    this.subscriptions.set(subId, {
+      id: subId,
+      types,
+      createdAt: Date.now(),
+    });
+
+    return {
+      resultType: 'complete',
+      'io.modelcontextprotocol/subscriptionId': subId,
+    };
+  }
+
+  // ── 레거시: resources/subscribe, resources/unsubscribe ──
+
+  private handleResourcesSubscribe(params?: Record<string, any>): any {
+    const uri = params?.uri;
+    if (!uri) {
+      throw Object.assign(new Error('Missing required param: uri'), { code: ErrorCodes.INVALID_PARAMS });
+    }
+    // 레거시 호환 — 구독만 기록하고 응답
+    const subId = `legacy_res_${++this.subscriptionCounter}`;
+    this.subscriptions.set(subId, {
+      id: subId,
+      types: ['resourceSubscriptions'],
+      createdAt: Date.now(),
+    });
+    return {};
+  }
+
+  private handleResourcesUnsubscribe(params?: Record<string, any>): any {
+    const uri = params?.uri;
+    if (!uri) {
+      throw Object.assign(new Error('Missing required param: uri'), { code: ErrorCodes.INVALID_PARAMS });
+    }
+    // 해당 URI의 구독 제거 (간단 구현: 전체 legacy 구독 중 하나 제거)
+    for (const [id, sub] of this.subscriptions) {
+      if (id.startsWith('legacy_res_')) {
+        this.subscriptions.delete(id);
+        break;
+      }
+    }
+    return {};
+  }
+
+  /**
+   * 변경 알림을 생성한다 (외부에서 호출).
+   * 도구/리소스/프롬프트가 런타임에 추가/제거될 때 호출.
+   */
+  createNotification(type: SubscriptionType): any[] {
+    const notifications: any[] = [];
+    const methodMap: Record<SubscriptionType, string> = {
+      toolsListChanged: 'notifications/tools/list_changed',
+      promptsListChanged: 'notifications/prompts/list_changed',
+      resourcesListChanged: 'notifications/resources/list_changed',
+      resourceSubscriptions: 'notifications/resources/updated',
+    };
+
+    for (const sub of this.subscriptions.values()) {
+      if (sub.types.includes(type)) {
+        notifications.push({
+          jsonrpc: '2.0',
+          method: methodMap[type],
+          params: {
+            'io.modelcontextprotocol/subscriptionId': sub.id,
+          },
+        });
+      }
+    }
+
+    return notifications;
+  }
+
+  /** 활성 구독 수 */
+  get subscriptionCount(): number {
+    return this.subscriptions.size;
   }
 
   // ── _meta 추출 ──

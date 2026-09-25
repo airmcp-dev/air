@@ -1,6 +1,6 @@
 {
   "name": "@airmcp-dev/core",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "author": "CodePedia Labs",
   "license": "Apache-2.0",
   "description": "MCP server framework — defineServer, defineTool, 19 plugins, storage, transport",
