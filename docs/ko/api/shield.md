@@ -1,6 +1,6 @@
-# Shield Reference
+# Shield 레퍼런스
 
-`@airmcp-dev/shield` — MCP security layer. Apache-2.0.
+`@airmcp-dev/shield` — MCP 보안 레이어. Apache-2.0.
 
 ## ThreatDetector
 
@@ -12,9 +12,9 @@ const detector = new ThreatDetector(customPatterns?);
 
 ### detector.scan(params)
 
-Scans all string values recursively. Normalizes Unicode homoglyphs and decodes URL encoding before matching.
+모든 문자열 값을 재귀적으로 스캔합니다. 매칭 전에 유니코드 호모글리프를 정규화하고 URL 인코딩을 디코딩합니다.
 
-Returns `ThreatResult`:
+반환값 `ThreatResult`:
 
 ```typescript
 interface ThreatResult {
@@ -27,7 +27,7 @@ interface ThreatItem {
   type: ThreatType;         // 'prompt-injection' | 'tool-poisoning' | 'path-traversal' | ...
   severity: 'low' | 'medium' | 'high' | 'critical';
   description: string;
-  evidence: string;         // first 200 chars
+  evidence: string;         // 처음 200자
 }
 ```
 
@@ -38,7 +38,7 @@ detector.addPattern({
   type: 'custom',
   severity: 'high',
   pattern: /CONFIDENTIAL/gi,
-  description: 'Confidential keyword detected',
+  description: '기밀 키워드 탐지',
 });
 ```
 
@@ -54,29 +54,29 @@ const guard = new SSRFGuard(config?);
 
 ```typescript
 interface SSRFConfig {
-  allowedHosts?: string[];      // whitelist (supports *.example.com)
-  blockedHosts?: string[];      // blacklist (cloud metadata auto-included)
-  blockInternalIPs?: boolean;   // default: true
+  allowedHosts?: string[];      // 화이트리스트 (*.example.com 지원)
+  blockedHosts?: string[];      // 블랙리스트 (클라우드 메타데이터 자동 포함)
+  blockInternalIPs?: boolean;   // 기본: true
   blockedPorts?: number[];
-  dnsResolve?: boolean;         // DNS rebinding protection, default: true
+  dnsResolve?: boolean;         // DNS rebinding 방어, 기본: true
 }
 ```
 
-### guard.check(url) → sync
+### guard.check(url) → 동기
 
-Returns `{ allowed: boolean; reason?: string }`. No DNS resolve.
+`{ allowed: boolean; reason?: string }` 반환. DNS resolve 없음.
 
-### guard.checkAsync(url) → async
+### guard.checkAsync(url) → 비동기
 
-Same as `check()` plus DNS rebinding detection. Resolves hostname → checks if IP is internal.
+`check()`와 동일 + DNS rebinding 탐지. hostname을 resolve하여 IP가 내부 대역인지 확인.
 
-### guard.scanParams(params) → sync
+### guard.scanParams(params) → 동기
 
-Extracts all URLs from params recursively, checks each.
+파라미터에서 모든 URL을 재귀 추출하여 각각 검사.
 
-### guard.scanParamsAsync(params) → async
+### guard.scanParamsAsync(params) → 비동기
 
-Same as `scanParams()` with DNS rebinding detection.
+`scanParams()`와 동일 + DNS rebinding 탐지.
 
 ## RugPullDetector
 
@@ -88,11 +88,11 @@ const detector = new RugPullDetector();
 
 ### detector.capture(toolName, description, params, annotations?, outputSchema?)
 
-Records SHA-256 hash snapshot of tool definition.
+도구 정의의 SHA-256 해시 스냅샷을 기록.
 
 ### detector.verify(toolName, description, params, annotations?, outputSchema?)
 
-Compares current definition against snapshot. Returns `RugPullResult`:
+현재 정의를 스냅샷과 비교. 반환값 `RugPullResult`:
 
 ```typescript
 interface RugPullResult {
@@ -109,11 +109,11 @@ interface RugPullResult {
 
 ### detector.verifyAll(tools)
 
-Batch verify all tools at once.
+모든 도구를 일괄 검증.
 
 ### detector.maxSeverity(result)
 
-Returns highest severity from result, or null.
+결과에서 가장 높은 심각도 반환. 없으면 null.
 
 ## DeputyGuard
 
@@ -127,9 +127,9 @@ const guard = new DeputyGuard();
 
 ```typescript
 interface DeputyPolicy {
-  allowedCallees: string[];     // tools this tool can call ('*' = any)
-  allowedResources?: string[];  // resource URIs (prefix match)
-  allowedHosts?: string[];      // network hosts (supports *.example.com)
+  allowedCallees: string[];     // 호출 가능한 도구 ('*' = 전부)
+  allowedResources?: string[];  // 리소스 URI (접두사 매칭)
+  allowedHosts?: string[];      // 네트워크 호스트 (*.example.com 지원)
 }
 ```
 
@@ -137,7 +137,7 @@ interface DeputyPolicy {
 ### guard.canAccessResource(toolName, resourceUri)
 ### guard.canAccessHost(toolName, host)
 
-All return `{ allowed: boolean; reason?: string }`.
+모두 `{ allowed: boolean; reason?: string }` 반환.
 
 ## ContextOvershareGuard
 
@@ -151,19 +151,19 @@ const guard = new ContextOvershareGuard(config?);
 
 ```typescript
 interface OvershareConfig {
-  maxResponseSize?: number;     // bytes, default: 100KB
-  sensitivePatterns?: string[]; // custom regex patterns
-  maskPII?: boolean;            // default: true
+  maxResponseSize?: number;     // bytes, 기본: 100KB
+  sensitivePatterns?: string[]; // 커스텀 정규식 패턴
+  maskPII?: boolean;            // 기본: true
 }
 ```
 
-### guard.filter(response) → masks + truncates
+### guard.filter(response) → 마스킹 + 잘라내기
 
-Returns `{ filtered: string; issues: Array<{ type, count }>; truncated: boolean }`.
+`{ filtered: string; issues: Array<{ type, count }>; truncated: boolean }` 반환.
 
-### guard.scan(response) → detect only, no masking
+### guard.scan(response) → 탐지만, 마스킹 없음
 
-Returns `{ hasSensitiveData: boolean; findings: Array<{ type, count }> }`.
+`{ hasSensitiveData: boolean; findings: Array<{ type, count }> }` 반환.
 
 ## SupplyChainVerifier
 
@@ -175,15 +175,15 @@ const verifier = new SupplyChainVerifier();
 
 ### verifier.capture(serverId, tools, packageName?)
 
-Records tool list fingerprint.
+도구 목록의 fingerprint를 기록.
 
 ### verifier.verify(serverId, tools)
 
-Returns `{ verified: boolean; reason?: string }`.
+`{ verified: boolean; reason?: string }` 반환.
 
 ### verifier.checkPackageName(name)
 
-Checks against 20+ typosquatting patterns. Returns `{ safe: boolean; reason?: string }`.
+20개 이상의 타이포스쿼팅 패턴으로 검사. `{ safe: boolean; reason?: string }` 반환.
 
 ## PolicyEngine
 
@@ -196,7 +196,7 @@ const engine = new PolicyEngine();
 ### engine.allow(name, target, priority?)
 ### engine.deny(name, target, priority?)
 
-Basic rules. Higher priority evaluates first. `target` supports `*` and prefix wildcards (`db-*`).
+기본 규칙. 높은 priority가 먼저 평가. `target`은 `*`과 접두사 와일드카드(`db-*`) 지원.
 
 ### engine.denyIf(name, target, condition, priority?)
 
@@ -215,8 +215,8 @@ interface PolicyCondition {
 
 ```typescript
 interface PolicySchedule {
-  daysOfWeek?: number[];    // 0=Sun, 6=Sat
-  startTime?: string;       // 'HH:mm' (24h)
+  daysOfWeek?: number[];    // 0=일, 6=토
+  startTime?: string;       // 'HH:mm' (24시간)
   endTime?: string;
   timezone?: string;
 }
@@ -224,7 +224,7 @@ interface PolicySchedule {
 
 ### engine.check(toolName, params?)
 
-Returns `{ allowed: boolean; rule?: PolicyRule; reason: string }`.
+`{ allowed: boolean; rule?: PolicyRule; reason: string }` 반환.
 
 ## RateLimiter
 
@@ -238,25 +238,25 @@ const limiter = new RateLimiter();
 
 ```typescript
 interface RateLimitConfig {
-  target: string;           // tool name, '*' for global
+  target: string;           // 도구명, '*'이면 글로벌
   windowMs: number;
   maxCalls: number;
-  burstLimit?: number;      // max calls in burst window (default: maxCalls)
-  burstWindowMs?: number;   // burst window (default: 1000ms)
+  burstLimit?: number;      // burst 윈도우 내 최대 호출 (기본: maxCalls)
+  burstWindowMs?: number;   // burst 윈도우 (기본: 1000ms)
 }
 ```
 
 ### limiter.check(target)
 
-Returns `{ allowed, remaining, resetAt, burstLimited? }`. Increments counter if allowed.
+`{ allowed, remaining, resetAt, burstLimited? }` 반환. 허용 시 카운터 증가.
 
 ### limiter.usage(target)
 
-Returns `{ used, max, windowMs }` or null.
+`{ used, max, windowMs }` 반환. 없으면 null.
 
 ### limiter.reset()
 
-Clears all counters.
+모든 카운터 초기화.
 
 ## PIIDetector
 
@@ -272,7 +272,7 @@ const detector = new PIIDetector({
 
 ### detector.detect(text)
 
-Returns `PIIEntity[]` sorted by position, deduplicated:
+위치순 정렬, 중복 제거된 `PIIEntity[]` 반환:
 
 ```typescript
 interface PIIEntity {
@@ -295,7 +295,7 @@ const redactor = new PIIRedactor({ mode: 'mask' });
 
 ### redactor.redact(text)
 
-Returns `{ redacted: string; entities: PIIEntity[] }`.
+`{ redacted: string; entities: PIIEntity[] }` 반환.
 
 ## PIITokenizer
 
@@ -303,11 +303,11 @@ Returns `{ redacted: string; entities: PIIEntity[] }`.
 import { PIITokenizer } from '@airmcp-dev/shield';
 
 const tokenizer = new PIITokenizer();
-const { tokenized, mappings } = tokenizer.tokenize('email: john@test.com');
-// tokenized === 'email: <EMAIL_1>'
+const { tokenized, mappings } = tokenizer.tokenize('이메일: john@test.com');
+// tokenized === '이메일: <EMAIL_1>'
 
 const restored = tokenizer.detokenize(tokenized, mappings);
-// restored === 'email: john@test.com'
+// restored === '이메일: john@test.com'
 ```
 
-Reversible tokenization for cases where you need to restore original values after processing.
+처리 후 원본 값을 복원해야 하는 경우에 사용하는 가역적 토크나이징.
