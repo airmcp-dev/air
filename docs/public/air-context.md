@@ -9,7 +9,8 @@ air is a TypeScript framework for building MCP (Model Context Protocol) servers.
 
 - **Packages**: `@airmcp-dev/core`, `@airmcp-dev/cli`, `@airmcp-dev/gateway`, `@airmcp-dev/logger`, `@airmcp-dev/meter`, `@airmcp-dev/shield`
 - **Runtime**: Node.js 18+, TypeScript ESM
-- **MCP SDK**: Uses `@modelcontextprotocol/sdk ^1.29.0` internally (MCP spec 2025-11-25 compatible)
+- **Protocol**: Self-implemented MCP 2026-07-28 (stateless) + 2025-11-25 (legacy) dual protocol — no SDK dependency
+- **Dependencies**: zod only
 - **License**: Apache-2.0
 
 ## Core API

@@ -9,6 +9,7 @@ const ROADMAP_ITEMS = [
   { versionKey: 'fnd.rm.3.version', titleKey: 'fnd.rm.3.title', statusKey: 'fnd.rm.3.status', itemsKey: 'fnd.rm.3.items' },
   { versionKey: 'fnd.rm.4.version', titleKey: 'fnd.rm.4.title', statusKey: 'fnd.rm.4.status', itemsKey: 'fnd.rm.4.items' },
   { versionKey: 'fnd.rm.5.version', titleKey: 'fnd.rm.5.title', statusKey: 'fnd.rm.5.status', itemsKey: 'fnd.rm.5.items' },
+  { versionKey: 'fnd.rm.6.version', titleKey: 'fnd.rm.6.title', statusKey: 'fnd.rm.6.status', itemsKey: 'fnd.rm.6.items' },
 ];
 
 const Foundation: FC = () => {

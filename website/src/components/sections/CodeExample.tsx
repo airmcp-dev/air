@@ -163,7 +163,7 @@ const CodeExample: FC = () => {
             </div>
             <div className="flex items-center gap-1.5 text-[10px] font-mono text-text-muted/40">
               <span className="w-1.5 h-1.5 rounded-full bg-air-500/50" />
-              air v0.4.0
+              air v0.5.0
             </div>
           </div>
         </div>
