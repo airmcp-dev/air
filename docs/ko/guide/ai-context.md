@@ -50,4 +50,5 @@ Windsurf, Cline, Aider 등 대부분의 AI 코딩 도구에서 사용할 수 있
 - CLI 명령어와 지원 클라이언트 목록
 - Gateway 설정
 - 커스텀 플러그인 구조
-- 주의사항 (ESM, stdio 로그, TTL 단위, elicitation 가드 등)
+- Shield 보안 레이어 (v0.4.0+): ThreatDetector, SSRFGuard, RugPullDetector, DeputyGuard, ContextOvershareGuard, SupplyChainVerifier, PolicyEngine, RateLimiter, PIIDetector/Redactor/Tokenizer
+- 주의사항 (ESM, stdio 로그, TTL 단위, elicitation 가드, Shield 주의사항 등)

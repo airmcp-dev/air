@@ -7,7 +7,7 @@
 
 air is a TypeScript framework for building MCP (Model Context Protocol) servers. With `@airmcp-dev/core` alone, you can define tools, resources, and prompts, and add retry/cache/auth with 19 built-in plugins in one line each.
 
-- **Packages**: `@airmcp-dev/core`, `@airmcp-dev/cli`, `@airmcp-dev/gateway`, `@airmcp-dev/logger`, `@airmcp-dev/meter`
+- **Packages**: `@airmcp-dev/core`, `@airmcp-dev/cli`, `@airmcp-dev/gateway`, `@airmcp-dev/logger`, `@airmcp-dev/meter`, `@airmcp-dev/shield`
 - **Runtime**: Node.js 18+, TypeScript ESM
 - **MCP SDK**: Uses `@modelcontextprotocol/sdk ^1.29.0` internally (MCP spec 2025-11-25 compatible)
 - **License**: Apache-2.0
@@ -313,3 +313,122 @@ function myPlugin(options?: MyOptions): AirPlugin {
 - `resource_link` returns a URI reference, not inline data — the client fetches the resource separately
 - Workers transport: no `server.start()`, no filesystem, no stdio/SSE. Use `server.fetch!(request)` and D1/KV for storage
 - Workers transport: `server.fetch` is always defined on AirServer, not just when `type: 'workers'` — safe to use for testing
+
+## Shield (Security Layer)
+
+`@airmcp-dev/shield` — OWASP MCP Top 10 protection, threat detection, PII redaction, policy engine, rate limiting. Apache-2.0.
+
+```typescript
+import {
+  ThreatDetector, SSRFGuard, RugPullDetector,
+  ContextOvershareGuard, DeputyGuard, SupplyChainVerifier,
+  PolicyEngine, RateLimiter,
+  PIIDetector, PIIRedactor, PIITokenizer,
+} from '@airmcp-dev/shield';
+```
+
+### Threat Detection
+
+```typescript
+const threat = new ThreatDetector();
+const result = threat.scan(params);  // { detected, threats[], score }
+// 22 built-in patterns: prompt injection, tool poisoning, path traversal,
+// command injection, SQL injection, SSRF, data exfiltration, rug pull
+// Unicode homoglyph normalization + URL decoding before scan
+```
+
+### SSRF Guard
+
+```typescript
+const ssrf = new SSRFGuard({
+  blockInternalIPs: true,      // 127.x, 10.x, 172.16-31.x, 192.168.x, metadata
+  allowedHosts: ['api.example.com', '*.trusted.io'],
+  blockedPorts: [6379, 27017],
+  dnsResolve: true,            // DNS rebinding protection
+});
+
+ssrf.check(url);               // sync, no DNS resolve
+await ssrf.checkAsync(url);    // async, with DNS rebinding detection
+await ssrf.scanParamsAsync(params);  // scan all URLs in params
+```
+
+### Rug Pull Detection
+
+```typescript
+const rugPull = new RugPullDetector();
+rugPull.capture('tool', description, params, annotations?, outputSchema?);
+rugPull.verify('tool', description, params);  // { detected, changes[] }
+// Severity: description=critical, params/annotations=high, outputSchema=medium
+```
+
+### Confused Deputy
+
+```typescript
+const deputy = new DeputyGuard();
+deputy.setPolicy('read-file', {
+  allowedCallees: [],                    // isolated
+  allowedResources: ['file:///docs/*'],
+  allowedHosts: [],
+});
+deputy.canCallTool('read-file', 'delete-file');  // { allowed: false }
+```
+
+### Context Overshare
+
+```typescript
+const overshare = new ContextOvershareGuard({ maskPII: true, maxResponseSize: 50_000 });
+overshare.filter(response);  // { filtered, issues[], truncated }
+overshare.scan(response);    // detect only, no masking
+```
+
+### Supply Chain
+
+```typescript
+const chain = new SupplyChainVerifier();
+chain.checkPackageName('mcp-sever-fs');  // { safe: false } — typosquatting
+chain.capture('server-1', tools);
+chain.verify('server-1', tools);         // { verified: false } if changed
+```
+
+### Policy Engine
+
+```typescript
+const policy = new PolicyEngine();
+policy.deny('block-delete', 'delete-*', 10);
+policy.allow('allow-read', 'read-*', 5);
+policy.denyIf('large-transfer', 'transfer', { paramGreaterThan: { amount: 10_000 } });
+policy.denyDuring('no-weekend', 'deploy-*', { daysOfWeek: [0, 6] });
+policy.allowDuring('biz-hours', 'admin-*', { startTime: '09:00', endTime: '18:00' });
+policy.check('transfer', { amount: 50_000 });  // { allowed, rule?, reason }
+```
+
+### Rate Limiter
+
+```typescript
+const limiter = new RateLimiter();
+limiter.addRule({ target: '*', maxCalls: 100, windowMs: 60_000, burstLimit: 10, burstWindowMs: 1_000 });
+limiter.check('search');  // { allowed, remaining, resetAt, burstLimited? }
+```
+
+### PII
+
+```typescript
+const detector = new PIIDetector({ minConfidence: 0.7 });
+detector.detect(text);  // PIIEntity[] — email, phone, SSN, credit card, IP, API key
+
+const redactor = new PIIRedactor({ mode: 'mask' });
+redactor.redact(text);  // { redacted, entities[] }
+
+const tokenizer = new PIITokenizer();
+tokenizer.tokenize(text);    // { tokenized: '<EMAIL_1>', mappings }
+tokenizer.detokenize(text, mappings);  // restore original
+```
+
+### Shield Gotchas
+
+- Shield is a standalone library, not a plugin — call guards manually in handlers or write a custom middleware
+- `ssrf.check()` is sync (no DNS resolve), `ssrf.checkAsync()` is async (with DNS rebinding detection) — use async in production
+- `RugPullDetector` stores snapshots in memory — restart loses them. Persist `getSnapshots()` if needed
+- `PolicyEngine` condition/schedule only applies when set — rules without condition always match
+- `RateLimiter` burst check happens after window check — both must pass
+- PII patterns are regex-based — false positives possible with date strings matching SSN patterns

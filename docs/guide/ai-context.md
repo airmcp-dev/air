@@ -50,4 +50,5 @@ Copy the content below and use as needed.
 - CLI commands and supported client list
 - Gateway config
 - Custom plugin structure
-- Gotchas (ESM, stdio logging, TTL units, elicitation guards, etc.)
+- Shield security layer (v0.4.0+): ThreatDetector, SSRFGuard, RugPullDetector, DeputyGuard, ContextOvershareGuard, SupplyChainVerifier, PolicyEngine, RateLimiter, PIIDetector/Redactor/Tokenizer
+- Gotchas (ESM, stdio logging, TTL units, elicitation guards, Shield caveats, etc.)
