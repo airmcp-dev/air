@@ -1,198 +1,67 @@
 // @airmcp-dev/core — server/server-runner.ts
-// MCP SDK 서버에 도구/리소스/프롬프트를 등록하고 transport를 연결하는 런타임
+//
+// air 자체 프로토콜 엔진 기반 서버 런타임.
+// MCP SDK 의존 없이 MCP 2026-07-28 + 레거시(2025-11-25) 듀얼 프로토콜을 지원한다.
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AirToolDef } from '../types/tool.js';
 import type { AirResourceDef } from '../types/resource.js';
 import type { AirPromptDef } from '../types/prompt.js';
 import type { AirConfig } from '../types/config.js';
-import type { PluginContext } from '../types/plugin.js';
-import { paramsToZodSchema } from '../tool/tool-schema.js';
 import { MiddlewareChain } from '../middleware/chain.js';
 import { createRequestContext } from '../context/request-context.js';
 import { ServerContext } from '../context/server-context.js';
 import { detectTransport } from '../transport/auto-detect.js';
-import { createStdioTransport } from '../transport/stdio-adapter.js';
-import { createHttpTransport } from '../transport/http-adapter.js';
-import { createWorkersFetchHandler } from '../transport/workers-adapter.js';
 import { AirSSETransport, AirSSESessionManager } from '../transport/air-sse-transport.js';
+import { McpProtocolEngine } from '../protocol/mcp-protocol.js';
+import { AirStdioTransport } from '../protocol/stdio-transport.js';
+import { AirHttpTransport } from '../protocol/http-transport.js';
 import { onShutdown } from './lifecycle.js';
 
 export class ServerRunner {
-  private mcp: McpServer;
+  private engine: McpProtocolEngine;
   private config: AirConfig;
   private serverCtx: ServerContext;
   private middlewareChain: MiddlewareChain;
   private tools: AirToolDef[] = [];
   private resources: AirResourceDef[] = [];
   private prompts: AirPromptDef[] = [];
+  private stdioTransport: AirStdioTransport | null = null;
 
   constructor(config: AirConfig, middlewareChain: MiddlewareChain) {
     this.config = config;
     this.middlewareChain = middlewareChain;
     this.serverCtx = new ServerContext(config.name, config.version || '0.1.0');
-    this.mcp = new McpServer({
+
+    // 프로토콜 엔진 생성 — SDK 대체
+    this.engine = new McpProtocolEngine({
       name: config.name,
       version: config.version || '0.1.0',
+      tools: this.tools,
+      resources: this.resources,
+      prompts: this.prompts,
+      callTool: async (toolName, params) => {
+        const tool = this.tools.find(t => t.name === toolName);
+        if (!tool) throw new Error(`Tool not found: ${toolName}`);
+        const reqCtx = createRequestContext(this.config.name, this.serverCtx.state);
+        return this.middlewareChain.execute(tool, params, reqCtx);
+      },
     });
   }
 
-  /** 도구 등록 — MCP SDK에 zod 스키마 + 핸들러 래퍼를 연결 */
+  /** 도구 등록 */
   registerTool(tool: AirToolDef) {
     this.tools.push(tool);
-    this.registerToolToServer(this.mcp, tool);
   }
 
   /** 리소스 등록 */
   registerResource(resource: AirResourceDef) {
     this.resources.push(resource);
-    this.registerResourceToServer(this.mcp, resource);
   }
 
   /** 프롬프트 등록 */
   registerPrompt(prompt: AirPromptDef) {
     this.prompts.push(prompt);
-    this.registerPromptToServer(this.mcp, prompt);
-  }
-
-  // ── 팩토리 메서드: 임의의 McpServer 인스턴스에 도구/리소스/프롬프트를 등록 ──
-
-  /** 도구를 지정 McpServer에 등록 (SDK registerTool API 사용) */
-  private registerToolToServer(server: McpServer, tool: AirToolDef) {
-    const inputSchema = paramsToZodSchema(tool.params);
-    const outputSchema = paramsToZodSchema(tool.outputSchema);
-
-    const config: Record<string, any> = {};
-    if (tool.description) config.description = tool.description;
-    if (tool.annotations?.title) config.title = tool.annotations.title;
-    if (inputSchema) config.inputSchema = inputSchema.shape;
-    if (outputSchema) config.outputSchema = outputSchema.shape;
-    if (tool.annotations) {
-      const { title, ...hints } = tool.annotations;
-      if (Object.keys(hints).length > 0) config.annotations = hints;
-    }
-
-    // 공통 핸들러 로직 — params와 extra에서 컨텍스트 구성 후 미들웨어 실행
-    const buildHandler = (params: Record<string, any>, extra: any) => {
-      const ctxOptions: Record<string, any> = {};
-      if (extra?.signal) ctxOptions.signal = extra.signal;
-
-      // extra.sendRequest를 통한 elicit 래퍼 생성
-      if (typeof extra?.sendRequest === 'function') {
-        ctxOptions.elicit = async (message: string, schema: Record<string, any>) => {
-          const properties: Record<string, any> = {};
-          for (const [key, def] of Object.entries(schema)) {
-            const d = def as { type: string; description?: string };
-            properties[key] = { type: d.type, ...(d.description ? { description: d.description } : {}) };
-          }
-          const result = await extra.sendRequest(
-            { method: 'elicitation/create', params: { message, requestedSchema: { type: 'object', properties } } },
-            { parse: (data: any) => data },
-          );
-          return { action: result.action, content: result.content };
-        };
-      }
-
-      return createRequestContext(this.config.name, this.serverCtx.state, ctxOptions);
-    };
-
-    const formatResult = async (params: Record<string, any>, extra: any) => {
-      const reqCtx = buildHandler(params, extra);
-      const content = await this.middlewareChain.execute(tool, params, reqCtx);
-
-      // outputSchema가 있으면 structuredContent로 반환
-      if (outputSchema && Array.isArray(content) && content.length > 0) {
-        const firstText = content[0];
-        if (firstText && typeof firstText === 'object' && 'text' in firstText && typeof firstText.text === 'string') {
-          try {
-            return { content, structuredContent: JSON.parse(firstText.text) } as any;
-          } catch { /* fall through */ }
-        }
-      }
-      return { content } as any;
-    };
-
-    // inputSchema 유무에 따라 콜백 시그니처 분기
-    if (inputSchema) {
-      const typedConfig = {
-        ...(tool.description ? { description: tool.description } : {}),
-        ...(tool.annotations?.title ? { title: tool.annotations.title } : {}),
-        inputSchema: inputSchema.shape,
-        ...(outputSchema ? { outputSchema: outputSchema.shape } : {}),
-        ...(config.annotations ? { annotations: config.annotations } : {}),
-      };
-      server.registerTool(tool.name, typedConfig, async (params: any, extra: any) => {
-        return formatResult(params || {}, extra);
-      });
-    } else {
-      const typedConfig = {
-        ...(tool.description ? { description: tool.description } : {}),
-        ...(tool.annotations?.title ? { title: tool.annotations.title } : {}),
-        ...(outputSchema ? { outputSchema: outputSchema.shape } : {}),
-        ...(config.annotations ? { annotations: config.annotations } : {}),
-      };
-      // inputSchema 없으면 콜백이 (extra) 한 개만 받음
-      server.registerTool(tool.name, typedConfig, async (extra: any) => {
-        return formatResult({}, extra);
-      });
-    }
-  }
-
-  /** 리소스를 지정 McpServer에 등록 */
-  private registerResourceToServer(server: McpServer, resource: AirResourceDef) {
-    const metadata: Record<string, any> = {};
-    if (resource.description) metadata.description = resource.description;
-    if (resource.mimeType) metadata.mimeType = resource.mimeType;
-
-    const uri = String(resource.uri);
-
-    try {
-      server.resource(
-        resource.name,
-        uri,
-        metadata,
-        async (reqUri: URL) => {
-          const ctx = { requestId: crypto.randomUUID(), serverName: this.config.name };
-          const result = await resource.handler(reqUri.href, ctx);
-          const content =
-            typeof result === 'string'
-              ? { uri: reqUri.href, text: result }
-              : 'text' in result
-                ? { uri: reqUri.href, text: result.text, mimeType: result.mimeType }
-                : { uri: reqUri.href, blob: result.blob, mimeType: result.mimeType };
-          return { contents: [content] };
-        },
-      );
-    } catch (err: any) {
-      console.error(`[air] Failed to register resource "${resource.name}" (uri: "${uri}"): ${err.message}\n${err.stack}`);
-    }
-  }
-
-  /** 프롬프트를 지정 McpServer에 등록 */
-  private registerPromptToServer(server: McpServer, prompt: AirPromptDef) {
-    server.prompt(prompt.name, prompt.description || '', async (args: any) => {
-      const messages = await prompt.handler(args || {});
-      return {
-        messages: messages.map((m) => ({
-          role: m.role as 'user' | 'assistant',
-          content: { type: 'text' as const, text: m.content },
-        })),
-      };
-    });
-  }
-
-  /** 모든 도구/리소스/프롬프트를 지정 McpServer에 일괄 등록 (SSE 세션용) */
-  private registerAllToServer(server: McpServer) {
-    for (const tool of this.tools) {
-      this.registerToolToServer(server, tool);
-    }
-    for (const resource of this.resources) {
-      this.registerResourceToServer(server, resource);
-    }
-    for (const prompt of this.prompts) {
-      this.registerPromptToServer(server, prompt);
-    }
   }
 
   /** 서버 시작 — transport 감지 + 연결 */
@@ -203,7 +72,6 @@ export class ServerRunner {
     // stdio 모드에서는 stdout이 MCP JSON-RPC 전용이므로
     // console.log를 stderr로 리다이렉트하여 프로토콜 오염 방지
     if (transportType === 'stdio') {
-      const _origLog = console.log;
       console.log = (...args: any[]) => console.error(...args);
     }
 
@@ -212,77 +80,67 @@ export class ServerRunner {
     );
 
     if (transportType === 'stdio') {
-      const transport = createStdioTransport();
-      onShutdown(async () => {
-        this.serverCtx.status = 'stopping';
-        await this.mcp.close();
-        this.serverCtx.status = 'stopped';
-      });
-      await this.mcp.connect(transport);
-
+      await this.startStdio();
     } else if (transportType === 'sse') {
-      // ── SSE Transport ──
-      // mcp-proxy 호환: GET /sse → SSE 스트림, POST /message → 메시지 수신
       await this.startSSE();
-
     } else if (transportType === 'http') {
-      // ── Streamable HTTP Transport ──
-      const { createServer } = await import('http');
-      const httpTransport = createHttpTransport(this.config.transport);
-      const port = this.config.transport?.port || this.config.dev?.port || 3100;
-
-      const server = createServer(async (req, res) => {
-        // MCP-Protocol-Version 헤더 설정 (2025-06-18 스펙)
-        res.setHeader('MCP-Protocol-Version', '2025-11-25');
-
-        if (req.method === 'POST') {
-          await httpTransport.handleRequest(req, res);
-        } else if (req.method === 'GET') {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(this.status()));
-        } else if (req.method === 'DELETE') {
-          await httpTransport.handleRequest(req, res);
-        } else {
-          res.writeHead(405).end();
-        }
-      });
-
-      await this.mcp.connect(httpTransport);
-
-      server.listen(port, () => {
-        console.log(`[air] HTTP server listening on port ${port}`);
-      });
-
-      onShutdown(async () => {
-        this.serverCtx.status = 'stopping';
-        server.close();
-        await this.mcp.close();
-        this.serverCtx.status = 'stopped';
-      });
+      await this.startHTTP();
     } else if (transportType === 'workers') {
-      // ── Workers Transport ──
-      // start()에서는 아무것도 안 함 — handleFetch()로 요청 처리
       console.log(`[air] Workers mode — use server.fetch(request) or export default server`);
     }
 
     this.serverCtx.status = 'running';
   }
 
-  /** SSE transport 시작 — AirSSETransport 기반, GET /sse + POST /message */
+  // ── stdio transport (자체 구현) ──
+
+  private async startStdio() {
+    this.stdioTransport = new AirStdioTransport(this.engine);
+    await this.stdioTransport.start();
+
+    onShutdown(async () => {
+      this.serverCtx.status = 'stopping';
+      this.stdioTransport?.stop();
+      this.serverCtx.status = 'stopped';
+    });
+  }
+
+  // ── Streamable HTTP transport (자체 구현, stateless) ──
+
+  private async startHTTP() {
+    const { createServer } = await import('http');
+    const port = this.config.transport?.port || this.config.dev?.port || 3100;
+    const httpTransport = new AirHttpTransport(this.engine, {
+      endpoint: '/mcp',
+    });
+
+    const server = createServer(async (req, res) => {
+      await httpTransport.handleRequest(req, res);
+    });
+
+    server.listen(port, () => {
+      console.log(`[air] HTTP server listening on port ${port}`);
+    });
+
+    onShutdown(async () => {
+      this.serverCtx.status = 'stopping';
+      server.close();
+      this.serverCtx.status = 'stopped';
+    });
+  }
+
+  // ── SSE transport (자체 구현 AirSSETransport) ──
+
   private async startSSE() {
     const { createServer } = await import('http');
     const port = this.config.transport?.port || this.config.dev?.port || 3100;
     const maxSessions = this.config.maxSseSessions ?? 200;
 
-    // 세션 관리자 — idle timeout, 자동 정리 포함
     const sessionManager = new AirSSESessionManager({
       maxSessions,
       idleTimeoutMs: this.config.sseIdleTimeoutMs ?? 600_000,
       cleanupIntervalMs: 60_000,
     });
-
-    // 세션별 McpServer 인스턴스 관리
-    const sessionServers = new Map<string, McpServer>();
 
     const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
       const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
@@ -290,8 +148,8 @@ export class ServerRunner {
       // CORS 헤더
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, MCP-Protocol-Version, Last-Event-ID');
-      res.setHeader('MCP-Protocol-Version', '2025-11-25');
+      res.setHeader('Access-Control-Allow-Headers',
+        'Content-Type, MCP-Protocol-Version, Mcp-Method, Mcp-Name, Last-Event-ID');
 
       if (req.method === 'OPTIONS') {
         res.writeHead(204).end();
@@ -300,7 +158,6 @@ export class ServerRunner {
 
       // GET /sse — 새 세션 생성 + SSE 연결
       if (req.method === 'GET' && url.pathname === '/sse') {
-        // 세션 수 상한 체크
         if (sessionManager.size >= maxSessions) {
           res.writeHead(503, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: `Max sessions reached (${maxSessions})` }));
@@ -314,33 +171,30 @@ export class ServerRunner {
           replayTtlMs: this.config.sseReplayTtlMs ?? 300_000,
         });
 
-        // 세션 등록
         if (!sessionManager.add(transport)) {
           res.writeHead(503, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Max sessions reached' }));
           return;
         }
 
-        // 세션별 McpServer 인스턴스 생성
-        const sessionServer = new McpServer({
-          name: this.config.name,
-          version: this.config.version || '0.1.0',
-        });
-        this.registerAllToServer(sessionServer);
-        sessionServers.set(transport.id, sessionServer);
-
         console.log(`[air] SSE client connected (session: ${transport.id})`);
+
+        // onmessage: SSE로 받은 JSON-RPC를 프로토콜 엔진에 전달 → 응답을 SSE로 전송
+        transport.onmessage = async (message: any) => {
+          const response = await this.engine.handleMessage(message);
+          // notification(id 없음)이 아닌 경우만 응답
+          if (message.id !== undefined) {
+            await transport.send(response);
+          }
+        };
 
         transport.onclose = () => {
           sessionManager.remove(transport.id);
-          sessionServers.delete(transport.id);
           console.log(`[air] SSE client disconnected (session: ${transport.id})`);
         };
 
-        // Last-Event-ID 기반 재연결 지원
         const lastEventId = req.headers['last-event-id'] as string | undefined;
         await transport.start(lastEventId);
-        await sessionServer.connect(transport);
         return;
       }
 
@@ -364,14 +218,14 @@ export class ServerRunner {
         return;
       }
 
-      // GET /health — 헬스체크 (게이트웨이 연동용)
+      // GET /health
       if (req.method === 'GET' && url.pathname === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: 'ok', sessions: sessionManager.size }));
         return;
       }
 
-      // GET / — 상태 확인
+      // GET /
       if (req.method === 'GET' && url.pathname === '/') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(this.status()));
@@ -388,39 +242,55 @@ export class ServerRunner {
     onShutdown(async () => {
       this.serverCtx.status = 'stopping';
       await sessionManager.closeAll();
-      sessionServers.clear();
       httpServer.close();
-      await this.mcp.close();
       this.serverCtx.status = 'stopped';
     });
   }
 
   /**
-   * Workers fetch 핸들러를 생성한다.
-   * MCP JSON-RPC 요청을 처리하고, 미들웨어 체인을 통해 도구를 실행한다.
+   * Workers fetch 핸들러 — 프로토콜 엔진 기반.
+   * Workers adapter도 같은 엔진을 사용하므로 동작이 통일된다.
    */
   createFetchHandler(): (request: Request) => Promise<Response> {
-    return createWorkersFetchHandler({
-      name: this.config.name,
-      version: this.config.version || '0.1.0',
-      tools: this.tools,
-      resources: this.resources,
-      prompts: this.prompts,
-      callTool: async (toolName: string, params: Record<string, any>) => {
-        const tool = this.tools.find(t => t.name === toolName);
-        if (!tool) {
-          throw new Error(`Tool not found: ${toolName}`);
-        }
-        const reqCtx = createRequestContext(this.config.name, this.serverCtx.state);
-        return this.middlewareChain.execute(tool, params, reqCtx);
-      },
-    });
+    return async (request: Request): Promise<Response> => {
+      const headers = { 'Content-Type': 'application/json' };
+
+      if (request.method === 'OPTIONS') {
+        return new Response(null, {
+          status: 204,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, MCP-Protocol-Version, Mcp-Method, Mcp-Name',
+          },
+        });
+      }
+
+      if (request.method !== 'POST') {
+        // GET → server/discover
+        const discoverRes = await this.engine.handleMessage({
+          jsonrpc: '2.0', method: 'server/discover', id: 'discover',
+        });
+        return Response.json(discoverRes, { headers });
+      }
+
+      try {
+        const body = await request.json() as any;
+        const response = await this.engine.handleMessage(body);
+        return Response.json(response, { headers });
+      } catch {
+        return Response.json(
+          { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } },
+          { status: 400, headers },
+        );
+      }
+    };
   }
 
   /** 서버 중지 */
   async stop() {
     this.serverCtx.status = 'stopping';
-    await this.mcp.close();
+    this.stdioTransport?.stop();
     this.serverCtx.status = 'stopped';
     console.log(`[air] "${this.config.name}" stopped`);
   }
@@ -446,5 +316,10 @@ export class ServerRunner {
   /** 서버 컨텍스트 */
   getContext() {
     return this.serverCtx;
+  }
+
+  /** 프로토콜 엔진 접근 (테스트용) */
+  getEngine(): McpProtocolEngine {
+    return this.engine;
   }
 }
