@@ -1,0 +1,22 @@
+[
+  {
+    "id": "prompts-list",
+    "name": "PromptsList",
+    "description": "Server lists available prompts with valid structure",
+    "status": "SUCCESS",
+    "timestamp": "2026-09-25T01:37:50.471Z",
+    "specReferences": [
+      {
+        "id": "MCP-Prompts-List",
+        "url": "https://modelcontextprotocol.io/specification/2025-06-18/server/prompts#listing-prompts"
+      }
+    ],
+    "details": {
+      "promptCount": 2,
+      "prompts": [
+        "simple_prompt",
+        "complex_prompt"
+      ]
+    }
+  }
+]

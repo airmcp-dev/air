@@ -174,7 +174,17 @@ export class McpProtocolEngine {
 
         // ── ping (레거시, 2026-07-28에서 제거됨) ──
         case 'ping':
-          result = { resultType: 'complete' };
+          result = {};
+          break;
+
+        // ── logging/setLevel (레거시) ──
+        case 'logging/setLevel':
+          result = {};
+          break;
+
+        // ── completion/complete (레거시) ──
+        case 'completion/complete':
+          result = { completion: { values: [], hasMore: false, total: 0 } };
           break;
 
         // ── subscriptions (2026-07-28) ──

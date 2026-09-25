@@ -1,0 +1,16 @@
+[
+  {
+    "id": "tools-call-error",
+    "name": "ToolsCallError",
+    "description": "Tool returns error correctly",
+    "status": "FAILURE",
+    "timestamp": "2026-09-25T01:37:50.430Z",
+    "errorMessage": "Failed: MCP error -32601: Tool not found: test_error_handling",
+    "specReferences": [
+      {
+        "id": "MCP-Error-Handling",
+        "url": "https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle"
+      }
+    ]
+  }
+]

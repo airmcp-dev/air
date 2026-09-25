@@ -1,0 +1,16 @@
+[
+  {
+    "id": "tools-call-mixed-content",
+    "name": "ToolsCallMixedContent",
+    "description": "Tool returns multiple content types",
+    "status": "FAILURE",
+    "timestamp": "2026-09-25T01:37:50.422Z",
+    "errorMessage": "Failed: MCP error -32601: Tool not found: test_multiple_content_types",
+    "specReferences": [
+      {
+        "id": "MCP-Tools-Call",
+        "url": "https://modelcontextprotocol.io/specification/2025-06-18/server/tools#calling-tools"
+      }
+    ]
+  }
+]

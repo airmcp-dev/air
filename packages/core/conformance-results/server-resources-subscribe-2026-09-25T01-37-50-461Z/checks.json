@@ -1,0 +1,15 @@
+[
+  {
+    "id": "resources-subscribe",
+    "name": "ResourcesSubscribe",
+    "description": "Subscribe to resource successfully",
+    "status": "SUCCESS",
+    "timestamp": "2026-09-25T01:37:50.464Z",
+    "specReferences": [
+      {
+        "id": "MCP-Resources-Subscribe",
+        "url": "https://modelcontextprotocol.io/specification/2025-06-18/server/resources#resource-subscriptions"
+      }
+    ]
+  }
+]

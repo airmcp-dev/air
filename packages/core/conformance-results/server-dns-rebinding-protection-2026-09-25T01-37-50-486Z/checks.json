@@ -1,0 +1,91 @@
+[
+  {
+    "id": "localhost-host-rebinding-rejected",
+    "name": "DNSRebindingRejected",
+    "description": "Server rejects requests with non-localhost Host/Origin headers",
+    "timestamp": "2026-09-25T01:37:50.486Z",
+    "specReferences": [
+      {
+        "id": "MCP-DNS-Rebinding-Protection",
+        "url": "https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices#local-mcp-server-compromise"
+      },
+      {
+        "id": "MCP-Transport-Security",
+        "url": "https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#security-warning"
+      }
+    ],
+    "status": "FAILURE",
+    "errorMessage": "Expected HTTP 4xx for invalid Host/Origin headers, got 200",
+    "details": {
+      "hostHeader": "evil.example.com",
+      "originHeader": "http://evil.example.com",
+      "statusCode": 200,
+      "body": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2025-11-25",
+          "capabilities": {
+            "tools": {
+              "listChanged": true
+            },
+            "resources": {
+              "listChanged": true
+            },
+            "prompts": {
+              "listChanged": true
+            }
+          },
+          "serverInfo": {
+            "name": "air-conformance",
+            "version": "1.0.0"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "localhost-host-valid-accepted",
+    "name": "LocalhostHostAccepted",
+    "description": "Server accepts requests with valid localhost Host/Origin headers",
+    "timestamp": "2026-09-25T01:37:50.486Z",
+    "specReferences": [
+      {
+        "id": "MCP-DNS-Rebinding-Protection",
+        "url": "https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices#local-mcp-server-compromise"
+      },
+      {
+        "id": "MCP-Transport-Security",
+        "url": "https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#security-warning"
+      }
+    ],
+    "status": "SUCCESS",
+    "details": {
+      "hostHeader": "localhost:19789",
+      "originHeader": "http://localhost:19789",
+      "statusCode": 200,
+      "body": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2025-11-25",
+          "capabilities": {
+            "tools": {
+              "listChanged": true
+            },
+            "resources": {
+              "listChanged": true
+            },
+            "prompts": {
+              "listChanged": true
+            }
+          },
+          "serverInfo": {
+            "name": "air-conformance",
+            "version": "1.0.0"
+          }
+        }
+      }
+    }
+  }
+]

@@ -18,6 +18,11 @@ echo "╚═══════════════════════�
 # 적합성 테스트 서버 시작
 echo "[1/3] Starting conformance server on port $PORT..."
 cd "$(dirname "$0")"
+
+# 기존 포트 점유 프로세스 정리
+kill $(lsof -t -i:$PORT) 2>/dev/null || true
+sleep 1
+
 npx tsx __tests__/conformance-server.ts &
 SERVER_PID=$!
 

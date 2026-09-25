@@ -1,0 +1,16 @@
+[
+  {
+    "id": "ping",
+    "name": "Ping",
+    "description": "Server responds to ping requests",
+    "status": "FAILURE",
+    "timestamp": "2026-09-25T01:37:50.387Z",
+    "errorMessage": "Failed: [\n  {\n    \"code\": \"unrecognized_keys\",\n    \"keys\": [\n      \"resultType\"\n    ],\n    \"path\": [],\n    \"message\": \"Unrecognized key: \\\"resultType\\\"\"\n  }\n]",
+    "specReferences": [
+      {
+        "id": "MCP-Ping",
+        "url": "https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/ping"
+      }
+    ]
+  }
+]

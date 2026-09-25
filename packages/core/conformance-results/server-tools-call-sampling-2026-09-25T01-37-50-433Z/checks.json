@@ -1,0 +1,16 @@
+[
+  {
+    "id": "tools-call-sampling",
+    "name": "ToolsCallSampling",
+    "description": "Tool requests LLM sampling from client",
+    "status": "FAILURE",
+    "timestamp": "2026-09-25T01:37:50.435Z",
+    "errorMessage": "Failed: MCP error -32601: Tool not found: test_sampling",
+    "specReferences": [
+      {
+        "id": "MCP-Sampling",
+        "url": "https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/sampling"
+      }
+    ]
+  }
+]

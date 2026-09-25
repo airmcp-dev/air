@@ -1,0 +1,16 @@
+[
+  {
+    "id": "resources-read-binary",
+    "name": "ResourcesReadBinary",
+    "description": "Read binary resource successfully",
+    "status": "FAILURE",
+    "timestamp": "2026-09-25T01:37:50.458Z",
+    "errorMessage": "Failed: MCP error -32602: Resource not found: test://static-binary",
+    "specReferences": [
+      {
+        "id": "MCP-Resources-Read",
+        "url": "https://modelcontextprotocol.io/specification/2025-06-18/server/resources#reading-resources"
+      }
+    ]
+  }
+]

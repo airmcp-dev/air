@@ -1,0 +1,16 @@
+[
+  {
+    "id": "elicitation-sep1330-general",
+    "name": "ElicitationSEP1330General",
+    "description": "Server requests elicitation with enum schemas",
+    "status": "FAILURE",
+    "timestamp": "2026-09-25T01:37:50.448Z",
+    "errorMessage": "Failed: MCP error -32601: Tool not found: test_elicitation_sep1330_enums",
+    "specReferences": [
+      {
+        "id": "SEP-1330",
+        "url": "https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1330"
+      }
+    ]
+  }
+]

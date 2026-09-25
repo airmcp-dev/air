@@ -1,0 +1,16 @@
+[
+  {
+    "id": "prompts-get-with-args",
+    "name": "PromptsGetWithArgs",
+    "description": "Get parameterized prompt with argument substitution",
+    "status": "FAILURE",
+    "timestamp": "2026-09-25T01:37:50.477Z",
+    "errorMessage": "Failed: MCP error -32602: Prompt not found: test_prompt_with_arguments",
+    "specReferences": [
+      {
+        "id": "MCP-Prompts-Get",
+        "url": "https://modelcontextprotocol.io/specification/2025-06-18/server/prompts#getting-prompts"
+      }
+    ]
+  }
+]
