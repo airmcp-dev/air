@@ -93,9 +93,14 @@ defineTool('search', {
     // context: { requestId, serverName, startedAt, state, signal?, elicit? }
     //
     // context.signal — AbortSignal for request cancellation
-    // context.elicit — request user input mid-execution (if client supports):
+    // context.elicit — request user input mid-execution (legacy, if client supports):
     //   const result = await context.elicit('Confirm?', { ok: { type: 'boolean' } });
     //   result: { action: 'accept'|'decline'|'cancel', content?: { ok: true } }
+    //
+    // context.requestInput — MRTR (2026-07-28): stateless input request
+    //   return context.requestInput('Confirm?', { ok: { type: 'boolean' } });
+    //   → server returns resultType: 'input_required', client retries with inputResponses
+    // context.inputResponses — array of client responses on retry (undefined on first call)
     //
     // Return value auto-converts to MCP content:
     //   string → text, number/boolean → String, object/array → JSON.stringify

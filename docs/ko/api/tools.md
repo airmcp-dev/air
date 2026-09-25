@@ -199,6 +199,38 @@ interface AirElicitResult {
 }
 ```
 
+### MRTR (Multi Round-Trip Requests) <Badge text="0.5.1" />
+
+MCP 2026-07-28 스펙. 기존 서버 주도 elicitation을 stateless 요청/재시도 패턴으로 대체합니다. handler에서 `ctx.requestInput()`을 반환하면 추가 입력을 요청하고, 클라이언트가 `inputResponses`와 함께 재요청합니다.
+
+```typescript
+defineTool('transfer', {
+  params: { amount: 'number', to: 'string' },
+  handler: async ({ amount, to }, ctx) => {
+    // 첫 호출: inputResponses 없으면 확인 요청
+    if (!ctx.inputResponses?.length) {
+      return ctx.requestInput(`${to}에게 ${amount} 이체합니다. 확인?`, {
+        confirmed: { type: 'boolean', description: '이체 확인' },
+      });
+    }
+    // 재요청: 클라이언트 응답 확인
+    const response = ctx.inputResponses[0];
+    if (response.action === 'accept' && response.content?.confirmed) {
+      return `${to}에게 ${amount} 이체 완료`;
+    }
+    return '이체 취소됨';
+  },
+});
+```
+
+프로토콜 흐름:
+
+1. 클라이언트가 `tools/call` 전송 → handler가 `ctx.requestInput()` 반환
+2. 서버가 `resultType: "input_required"` + `inputRequests`로 응답
+3. 클라이언트가 사용자에게 프롬프트 표시, 입력 수집
+4. 클라이언트가 같은 `tools/call`을 `inputResponses`와 함께 재전송
+5. 서버가 `resultType: "complete"` + 최종 결과로 응답
+
 ## paramsToZodSchema(params?)
 
 단축/객체 파라미터를 Zod 스키마로 변환. `.passthrough()` 적용.
@@ -213,16 +245,31 @@ paramsToZodSchema(undefined);  // → undefined
 paramsToZodSchema({});          // → undefined
 ```
 
-## paramsToJsonSchema(params?)
+## paramsToJsonSchema(params?) <Badge text="0.5.1 강화" />
 
-MCP 도구 등록용 JSON Schema로 변환.
+MCP 도구 등록용 JSON Schema로 변환. v0.5.1부터 Zod v3/v4 스키마를 자동 감지하여 description, enum, default, optional을 보존합니다.
 
 ```typescript
-import { paramsToJsonSchema } from '@airmcp-dev/core';
-
+// ParamShorthand
 paramsToJsonSchema({ query: 'string', limit: 'number?' });
-// → { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'number' } }, required: ['query'] }
+
+// Zod 스키마 (v3 + v4)
+paramsToJsonSchema({
+  query: z.string().describe('검색어'),
+  limit: z.number().optional(),
+  order: z.enum(['asc', 'desc']),
+  page: z.number().default(1),
+});
+
+// 혼합 (shorthand + Zod + objectDef)
+paramsToJsonSchema({
+  name: 'string',
+  age: z.number(),
+  email: { type: 'string', description: '이메일', optional: true },
+});
 ```
+
+지원 Zod 타입: `string`, `number`, `boolean`, `array`, `object`, `optional`, `default`, `enum`, `record`, `any`.
 
 ## normalizeResult(value)
 

@@ -167,6 +167,49 @@ interface AirElicitResult {
 }
 ```
 
+### MRTR (Multi Round-Trip Requests) <Badge text="0.5.1" />
+
+MCP 2026-07-28 spec. Replaces server-initiated elicitation with a stateless request/retry pattern. The handler returns `ctx.requestInput()` to ask for additional input, and the client retries the same request with `inputResponses`.
+
+```typescript
+defineTool('transfer', {
+  params: { amount: 'number', to: 'string' },
+  handler: async ({ amount, to }, ctx) => {
+    // First call: no inputResponses → ask for confirmation
+    if (!ctx.inputResponses?.length) {
+      return ctx.requestInput(`Transfer ${amount} to ${to}. Confirm?`, {
+        confirmed: { type: 'boolean', description: 'Confirm transfer' },
+      });
+    }
+    // Retry: client sent inputResponses
+    const response = ctx.inputResponses[0];
+    if (response.action === 'accept' && response.content?.confirmed) {
+      return `Transferred ${amount} to ${to}`;
+    }
+    return 'Transfer cancelled';
+  },
+});
+```
+
+Protocol flow:
+
+1. Client sends `tools/call` → handler returns `ctx.requestInput()`
+2. Server responds with `resultType: "input_required"` + `inputRequests`
+3. Client shows prompt to user, collects input
+4. Client retries same `tools/call` with `inputResponses` in params
+5. Server responds with `resultType: "complete"` + final result
+
+```typescript
+// ctx.requestInput(message, schema, requestState?)
+ctx.requestInput('Confirm?', {
+  confirmed: { type: 'boolean', description: 'Are you sure?' },
+}, 'optional-state-id');
+
+// ctx.inputResponses (on retry)
+ctx.inputResponses // AirInputResponse[] | undefined
+// [{ type: 'elicitation', action: 'accept', content: { confirmed: true } }]
+```
+
 ## paramsToZodSchema(params?)
 
 Convert shorthand to Zod. Applies `.passthrough()`. Returns `undefined` if empty.
@@ -176,14 +219,38 @@ paramsToZodSchema({ query: 'string', limit: 'number?' });
 // → z.object({ query: z.string(), limit: z.number().optional() }).passthrough()
 ```
 
-## paramsToJsonSchema(params?)
+## paramsToJsonSchema(params?) <Badge text="0.5.1 enhanced" />
 
-Convert to JSON Schema for MCP registration.
+Convert to JSON Schema for MCP registration. Since v0.5.1, automatically detects and converts Zod v3/v4 schemas — preserving description, enum, default, and optional status.
 
 ```typescript
+// ParamShorthand
 paramsToJsonSchema({ query: 'string', limit: 'number?' });
-// → { type: 'object', properties: { ... }, required: ['query'] }
+// → { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'number' } }, required: ['query'] }
+
+// Zod schemas (v3 + v4)
+paramsToJsonSchema({
+  query: z.string().describe('Search query'),
+  limit: z.number().optional(),
+  order: z.enum(['asc', 'desc']),
+  page: z.number().default(1),
+});
+// → { type: 'object', properties: {
+//      query: { type: 'string', description: 'Search query' },
+//      limit: { type: 'number' },
+//      order: { type: 'string', enum: ['asc', 'desc'] },
+//      page: { type: 'number', default: 1 },
+//    }, required: ['query', 'order'] }
+
+// Mixed (shorthand + Zod + objectDef)
+paramsToJsonSchema({
+  name: 'string',
+  age: z.number(),
+  email: { type: 'string', description: 'Email', optional: true },
+});
 ```
+
+Supported Zod types: `string`, `number`, `boolean`, `array`, `object`, `optional`, `default`, `enum`, `record`, `any`.
 
 ## normalizeResult(value)
 
