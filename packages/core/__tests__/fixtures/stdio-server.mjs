@@ -13,6 +13,17 @@ const server = defineServer({
       params: { text: 'string' },
       handler: async ({ text }) => text,
     }),
+    defineTool('ask', {
+      description: 'Progress, log, then ask the client a question (elicitation)',
+      params: {},
+      handler: async (_params, ctx) => {
+        ctx.progress(1, 2);
+        ctx.log('info', 'asking');
+        if (!ctx.elicit) return 'no-elicit';
+        const r = await ctx.elicit('Name?', { name: { type: 'string', required: true } });
+        return `${r.action}:${r.content?.name ?? ''}`;
+      },
+    }),
   ],
 });
 

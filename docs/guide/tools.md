@@ -154,8 +154,46 @@ interface AirToolContext {
   serverName: string;         // From defineServer name
   startedAt: number;          // Date.now()
   state: Record<string, any>; // Same reference as server.state
+  signal?: AbortSignal;       // Cancellation
+
+  // Server → client channel (v0.6.0+)
+  progress: (progress: number, total?: number, message?: string) => void;
+  log: (level: AirLogLevel, data: any, logger?: string) => void;
+  elicit?: (message: string, schema: AirElicitSchema | AirElicitJsonSchema) => Promise<AirElicitResult>;
 }
 ```
+
+### Talking back to the client (v0.6.0+)
+
+While a tool runs, it can send notifications and ask the user for input. These go over the same connection the request came in on: the stdio stream, the SSE session, or — for Streamable HTTP — an SSE response stream that air opens when the client sent `Accept: text/event-stream`.
+
+```typescript
+defineTool('import', {
+  params: { url: 'string' },
+  handler: async ({ url }, ctx) => {
+    ctx.log('info', `Fetching ${url}`, 'import');
+
+    for (let i = 0; i < 4; i++) {
+      await step(i);
+      ctx.progress(i + 1, 4, `step ${i + 1}`);   // notifications/progress
+    }
+
+    if (ctx.elicit) {                              // undefined when the client can't do elicitation
+      const answer = await ctx.elicit('Overwrite existing rows?', {
+        overwrite: { type: 'boolean', required: true, default: false },
+      });
+      if (answer.action !== 'accept' || !answer.content?.overwrite) return 'Cancelled';
+    }
+    return 'Imported';
+  },
+});
+```
+
+- `ctx.progress` only sends when the client put a `progressToken` in the request's `_meta`; otherwise it is a no-op.
+- `ctx.log` respects the level the client chose with `logging/setLevel` (levels follow RFC 5424: `debug` < `info` < `notice` < `warning` < `error` < `critical` < `alert` < `emergency`).
+- `ctx.elicit` is defined only when the transport is bidirectional and the client declared the `elicitation` capability. The shorthand schema becomes a JSON Schema object; pass `{ type: 'object', properties, required }` directly when you need `oneOf`, arrays or other details.
+- Cloudflare Workers transport has no channel: `progress`/`log` are no-ops and `elicit` is `undefined`.
+- Plain-JSON clients (no `text/event-stream` in `Accept`) still get the final result; notifications are dropped.
 
 ### Sync and async
 

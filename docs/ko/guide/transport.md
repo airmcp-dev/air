@@ -124,6 +124,12 @@ defineServer({
 });
 ```
 
+### 서버 → 클라이언트 메시지 (v0.6.0+)
+
+요청에 `Accept: text/event-stream`이 있는 `tools/call`은 JSON 한 덩어리 대신 SSE 스트림으로 응답합니다. 도구가 실행되는 동안 `notifications/progress`, `notifications/message`, 서버발 요청(`elicitation/create`)을 그 스트림에 쓰고, 마지막에 최종 JSON-RPC 응답을 보낸 뒤 닫습니다. 서버 요청에 대한 답은 클라이언트가 같은 엔드포인트로 JSON-RPC 응답을 `POST`하면 됩니다(air는 `202`). `application/json`만 받는 클라이언트는 이전처럼 최종 결과만 받고 알림은 버려집니다. [도구 → 실행 중 클라이언트에 말 걸기](./tools#실행-중-클라이언트에-말-걸기-v060) 참고.
+
+`GET /mcp`는 독립 서버발 스트림을 열지 않고 `server/discover`를 돌려주므로, 요청 밖에서의 채널은 없습니다.
+
 각 세션에 고유 ID(`crypto.randomUUID()`)가 자동 할당됩니다.
 
 ## Cloudflare Workers

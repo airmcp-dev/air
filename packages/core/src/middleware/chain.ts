@@ -38,6 +38,8 @@ export class MiddlewareChain {
       startedAt: toolCtx.startedAt,
       meta: {
         _serverState: toolCtx.state,
+        // 핸들러를 다시 부르는 플러그인(retry 등)이 같은 컨텍스트(elicit/progress/log/signal)를 쓰도록
+        _toolCtx: toolCtx,
       },
     };
 

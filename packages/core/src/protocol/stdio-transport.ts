@@ -8,14 +8,22 @@
 //   - stdout에는 MCP 메시지 외에는 아무것도 쓰지 않는다.
 
 import type { McpProtocolEngine } from './mcp-protocol.js';
+import { PendingRequests, isJsonRpcResponse, type AirOutbound } from './outbound.js';
 
 export class AirStdioTransport {
   private engine: McpProtocolEngine;
   private buffer = '';
   private running = false;
+  /** 서버 → 클라이언트 채널: stdout으로 쓰고, stdin으로 오는 JSON-RPC 응답을 id로 매칭 */
+  private pending = new PendingRequests({ prefix: 'stdio' });
+  private outbound: AirOutbound;
 
   constructor(engine: McpProtocolEngine) {
     this.engine = engine;
+    this.outbound = {
+      notify: (method, params) => this.write({ jsonrpc: '2.0', method, ...(params ? { params } : {}) }),
+      request: (method, params) => this.pending.send(method, params, msg => this.write(msg)),
+    };
   }
 
   /** stdio transport를 시작한다. stdin을 읽고 stdout으로 응답한다. */
@@ -79,10 +87,18 @@ export class AirStdioTransport {
       return;
     }
 
+    // 클라이언트가 보낸 JSON-RPC 응답 — 서버발 요청(elicitation 등)의 답
+    if (isJsonRpcResponse(message)) {
+      this.pending.resolve(message);
+      return;
+    }
+
     // 배치 요청 처리 (JSON-RPC 2.0 스펙)
     if (Array.isArray(message)) {
       const responses = await Promise.all(
-        message.map(msg => this.engine.handleMessage(msg)),
+        message.map(msg => isJsonRpcResponse(msg)
+          ? (this.pending.resolve(msg), { jsonrpc: '2.0' as const, id: null })
+          : this.engine.handleMessage(msg, this.outbound)),
       );
       // notification(id 없음)은 응답 없이 필터링
       const filtered = responses.filter(r => r.id !== null);
@@ -93,7 +109,7 @@ export class AirStdioTransport {
     }
 
     // 단일 요청
-    const response = await this.engine.handleMessage(message);
+    const response = await this.engine.handleMessage(message, this.outbound);
 
     // notification은 응답 없음 (id가 undefined인 경우)
     if (message.id === undefined && !message.id) return;

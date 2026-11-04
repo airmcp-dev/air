@@ -52,13 +52,20 @@ function request(
         let data = '';
         res.setEncoding('utf-8');
         res.on('data', (d) => (data += d));
-        res.on('end', () =>
-          resolve({
-            status: res.statusCode!,
-            headers: res.headers,
-            json: data ? JSON.parse(data) : null,
-          }),
-        );
+        res.on('end', () => {
+          try {
+            // SSE 응답이면 마지막 data: 줄(최종 JSON-RPC 응답)을 json으로 돌려준다
+            const isSse = String(res.headers['content-type']).includes('text/event-stream');
+            const json = !data
+              ? null
+              : isSse
+                ? JSON.parse(data.split('\n').filter((l) => l.startsWith('data: ')).pop()!.slice(6))
+                : JSON.parse(data);
+            resolve({ status: res.statusCode!, headers: res.headers, json });
+          } catch (err) {
+            reject(err);
+          }
+        });
       },
     );
     req.on('error', reject);

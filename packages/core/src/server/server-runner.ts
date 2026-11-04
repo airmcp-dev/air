@@ -17,6 +17,7 @@ import { McpProtocolEngine } from '../protocol/mcp-protocol.js';
 import { AirStdioTransport } from '../protocol/stdio-transport.js';
 import { AirHttpTransport } from '../protocol/http-transport.js';
 import { checkOrigin } from '../protocol/origin.js';
+import { PendingRequests, isJsonRpcResponse, type AirOutbound } from '../protocol/outbound.js';
 import { onShutdown } from './lifecycle.js';
 
 export class ServerRunner {
@@ -41,11 +42,15 @@ export class ServerRunner {
       tools: this.tools,
       resources: this.resources,
       prompts: this.prompts,
-      callTool: async (toolName, params, meta, inputResponses) => {
+      callTool: async (toolName, params, meta, inputResponses, channel) => {
         const tool = this.tools.find(t => t.name === toolName);
         if (!tool) throw new Error(`Tool not found: ${toolName}`);
         const reqCtx = createRequestContext(this.config.name, this.serverCtx.state, {
           inputResponses,
+          outbound: channel?.outbound,
+          progressToken: channel?.progressToken,
+          clientSupportsElicitation: channel?.clientSupportsElicitation,
+          getLogLevel: channel?.getLogLevel,
         });
         return this.middlewareChain.executeTool(tool, params, reqCtx);
       },
@@ -191,9 +196,21 @@ export class ServerRunner {
 
         console.log(`[air] SSE client connected (session: ${transport.id})`);
 
+        // 서버 → 클라이언트 채널: 세션 스트림으로 알림·서버발 요청을 보내고, 응답은 POST /message로 받는다
+        const pending = new PendingRequests({ prefix: `sse-${transport.id.slice(0, 8)}` });
+        const outbound: AirOutbound = {
+          notify: (method, params) => { void transport.send({ jsonrpc: '2.0', method, ...(params ? { params } : {}) }); },
+          request: (method, params) => pending.send(method, params, msg => { void transport.send(msg); }),
+        };
+
         // onmessage: SSE로 받은 JSON-RPC를 프로토콜 엔진에 전달 → 응답을 SSE로 전송
         transport.onmessage = async (message: any) => {
-          const response = await this.engine.handleMessage(message);
+          // 클라이언트가 보낸 JSON-RPC 응답(elicitation 등의 답)은 대기 중인 요청으로
+          if (isJsonRpcResponse(message)) {
+            pending.resolve(message);
+            return;
+          }
+          const response = await this.engine.handleMessage(message, outbound);
           // notification(id 없음)이 아닌 경우만 응답
           if (message.id !== undefined) {
             await transport.send(response);
@@ -201,6 +218,7 @@ export class ServerRunner {
         };
 
         transport.onclose = () => {
+          pending.rejectAll('SSE session closed');
           sessionManager.remove(transport.id);
           console.log(`[air] SSE client disconnected (session: ${transport.id})`);
         };

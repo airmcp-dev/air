@@ -29,14 +29,32 @@ export type AirToolHandler<P = Record<string, any>> = (
   context: AirToolContext,
 ) => Promise<AirToolResponse> | AirToolResponse;
 
-/** Elicitation 요청 스키마 (form 모드) */
+/**
+ * Elicitation 요청 스키마 — 단축형.
+ * 키마다 타입을 적으면 `{ type: 'object', properties, required }`로 변환된다.
+ * default/enum/oneOf/array 같은 세부가 필요하면 AirElicitJsonSchema를 그대로 넘긴다.
+ */
 export interface AirElicitSchema {
   [key: string]: {
-    type: 'string' | 'number' | 'boolean';
+    type: 'string' | 'number' | 'integer' | 'boolean';
     description?: string;
     required?: boolean;
+    default?: any;
+    enum?: string[];
   };
 }
+
+/** Elicitation 요청 스키마 — MCP requestedSchema 그대로 (JSON Schema object) */
+export interface AirElicitJsonSchema {
+  type: 'object';
+  properties: Record<string, any>;
+  required?: string[];
+  [key: string]: any;
+}
+
+/** 로그 레벨 (MCP logging, RFC 5424 순) */
+export type AirLogLevel =
+  | 'debug' | 'info' | 'notice' | 'warning' | 'error' | 'critical' | 'alert' | 'emergency';
 
 /** Elicitation 결과 */
 export interface AirElicitResult {
@@ -87,10 +105,20 @@ export interface AirToolContext {
   /** 요청 취소 시그널 (MCP SDK extra.signal) */
   signal?: AbortSignal;
   /**
-   * 사용자에게 입력을 요청 (MCP Elicitation, 2025-06-18+)
-   * 클라이언트가 elicitation을 지원하지 않으면 undefined
+   * 사용자에게 입력을 요청 (MCP Elicitation, 2025-06-18+).
+   * transport가 양방향이 아니거나(workers) 클라이언트가 elicitation 능력을 선언하지 않았으면 undefined.
    */
-  elicit?: (message: string, schema: AirElicitSchema) => Promise<AirElicitResult>;
+  elicit?: (message: string, schema: AirElicitSchema | AirElicitJsonSchema) => Promise<AirElicitResult>;
+  /**
+   * 진행률 알림 (notifications/progress).
+   * 클라이언트가 요청에 `_meta.progressToken`을 넣었을 때만 실제로 전송되고, 아니면 no-op.
+   */
+  progress: (progress: number, total?: number, message?: string) => void;
+  /**
+   * 로그 알림 (notifications/message).
+   * 클라이언트가 logging/setLevel로 정한 레벨보다 낮으면 보내지 않는다. 채널이 없으면 no-op.
+   */
+  log: (level: AirLogLevel, data: any, logger?: string) => void;
   /**
    * MRTR: 클라이언트가 보낸 inputResponses (재시도 요청 시)
    * 첫 요청에서는 undefined, inputRequired 후 재요청 시 값이 들어옴

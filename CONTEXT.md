@@ -70,7 +70,11 @@ defineTool('search', {
   },
   layer: 4,                             // L1-L7 Meter hint (optional)
   handler: async ({ query, limit }, context) => {
-    // context: { requestId, serverName, startedAt, state }
+    // context: { requestId, serverName, startedAt, state, signal?, progress, log, elicit? }
+    //   context.progress(n, total?, message?)  → notifications/progress (only if client sent _meta.progressToken)
+    //   context.log('info', data, logger?)     → notifications/message (respects logging/setLevel)
+    //   await context.elicit(message, schema)  → elicitation/create; undefined if client lacks the capability
+    //   (stdio/sse/http transports; workers has no channel → progress/log no-op, elicit undefined)
     // Return value auto-converts to MCP content:
     //   string → text, number/boolean → String, object/array → JSON.stringify
     //   { text } → text, { image, mimeType } → image, { content: [...] } → passthrough

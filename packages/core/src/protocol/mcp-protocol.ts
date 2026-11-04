@@ -6,7 +6,8 @@
 // Workers adapter에서 이미 하고 있던 JSON-RPC 직접 처리를 정규화한 것.
 // 모든 transport(stdio, SSE, HTTP, Workers)가 이 엔진을 공유한다.
 
-import type { AirToolDef } from '../types/tool.js';
+import type { AirToolDef, AirLogLevel } from '../types/tool.js';
+import type { AirOutbound } from './outbound.js';
 import type { AirResourceDef } from '../types/resource.js';
 import type { AirPromptDef } from '../types/prompt.js';
 import { paramsToJsonSchema } from '../tool/tool-schema.js';
@@ -63,6 +64,18 @@ export interface ClientMeta {
   clientCapabilities?: Record<string, any>;
 }
 
+/** tools/call 한 건에 대한 서버 → 클라이언트 채널 정보 (transport → 엔진 → callTool) */
+export interface ToolCallChannel {
+  /** transport가 제공한 채널. 없으면 알림/서버발 요청 불가 */
+  outbound?: AirOutbound;
+  /** 요청의 _meta.progressToken */
+  progressToken?: string | number;
+  /** 클라이언트가 initialize에서 elicitation 능력을 선언했는지 */
+  clientSupportsElicitation: boolean;
+  /** logging/setLevel로 정한 현재 로그 레벨 */
+  getLogLevel: () => AirLogLevel | undefined;
+}
+
 /** server/discover 응답 */
 export interface DiscoverResult {
   resultType: 'complete';
@@ -71,6 +84,7 @@ export interface DiscoverResult {
     tools?: { listChanged: boolean };
     resources?: { listChanged: boolean };
     prompts?: { listChanged: boolean };
+    logging?: Record<string, never>;
     extensions?: Record<string, any>;
   };
   _meta: {
@@ -86,7 +100,13 @@ export interface ProtocolEngineConfig {
   resources: AirResourceDef[];
   prompts: AirPromptDef[];
   /** 도구 실행 함수 — 미들웨어 체인을 거쳐 실행 (content 배열 또는 { content, isError } 반환) */
-  callTool: (toolName: string, params: Record<string, any>, meta?: ClientMeta, inputResponses?: any[]) => Promise<any>;
+  callTool: (
+    toolName: string,
+    params: Record<string, any>,
+    meta?: ClientMeta,
+    inputResponses?: any[],
+    channel?: ToolCallChannel,
+  ) => Promise<any>;
   /** 캐시 힌트 (기본: 300000ms) */
   defaultTtlMs?: number;
   /** 캐시 스코프 (기본: 'public') */
@@ -110,17 +130,33 @@ export class McpProtocolEngine {
   private serverInfo: { name: string; version: string };
   private subscriptions = new Map<string, Subscription>();
   private subscriptionCounter = 0;
+  /** initialize에서 받은 클라이언트 능력 (레거시 핸드셰이크) */
+  private clientCapabilities: Record<string, any> = {};
+  /** logging/setLevel로 정한 레벨 — 없으면 전부 보낸다 */
+  private logLevel: AirLogLevel | undefined;
 
   constructor(config: ProtocolEngineConfig) {
     this.config = config;
     this.serverInfo = { name: config.name, version: config.version };
   }
 
+  /** 서버가 선언하는 능력 (initialize / server/discover 공통) */
+  private serverCapabilities() {
+    return {
+      tools: { listChanged: true },
+      resources: { listChanged: true },
+      prompts: { listChanged: true },
+      logging: {},
+    };
+  }
+
   /**
    * JSON-RPC 메시지를 처리하고 응답을 반환한다.
    * 2026-07-28 (stateless, _meta) + 레거시(initialize 핸드셰이크) 둘 다 지원.
+   *
+   * @param outbound transport가 제공하는 서버 → 클라이언트 채널. tools/call 중 알림·서버발 요청에 쓴다.
    */
-  async handleMessage(message: JsonRpcRequest): Promise<JsonRpcResponse> {
+  async handleMessage(message: JsonRpcRequest, outbound?: AirOutbound): Promise<JsonRpcResponse> {
     const { method, id, params } = message;
 
     // _meta에서 클라이언트 정보 추출
@@ -150,7 +186,7 @@ export class McpProtocolEngine {
           result = this.handleToolsList(isModern);
           break;
         case 'tools/call':
-          result = await this.handleToolsCall(params, meta);
+          result = await this.handleToolsCall(params, meta, outbound);
           break;
 
         // ── resources ──
@@ -179,6 +215,7 @@ export class McpProtocolEngine {
 
         // ── logging/setLevel (레거시) ──
         case 'logging/setLevel':
+          this.logLevel = params?.level;
           result = {};
           break;
 
@@ -224,11 +261,7 @@ export class McpProtocolEngine {
     return {
       resultType: 'complete',
       supportedVersions: SUPPORTED_VERSIONS,
-      capabilities: {
-        tools: { listChanged: true },
-        resources: { listChanged: true },
-        prompts: { listChanged: true },
-      },
+      capabilities: this.serverCapabilities(),
       _meta: {
         'io.modelcontextprotocol/serverInfo': this.serverInfo,
       },
@@ -239,17 +272,15 @@ export class McpProtocolEngine {
 
   private handleInitialize(params?: Record<string, any>): any {
     const clientVersion = params?.protocolVersion;
+    // 클라이언트 능력 기억 — elicitation 지원 여부 판단에 쓴다
+    this.clientCapabilities = params?.capabilities ?? {};
 
     // 클라이언트가 2026-07-28을 요청하면 UnsupportedProtocolVersion 에러 반환
     // → 클라이언트는 server/discover를 사용해야 함
     if (clientVersion === PROTOCOL_VERSIONS.MODERN) {
       return {
         protocolVersion: PROTOCOL_VERSIONS.LEGACY,
-        capabilities: {
-          tools: { listChanged: true },
-          resources: { listChanged: true },
-          prompts: { listChanged: true },
-        },
+        capabilities: this.serverCapabilities(),
         serverInfo: this.serverInfo,
         // 지원 버전을 알려줘서 클라이언트가 discover로 전환 가능
         _supportedVersions: SUPPORTED_VERSIONS,
@@ -263,11 +294,7 @@ export class McpProtocolEngine {
 
     return {
       protocolVersion: negotiated,
-      capabilities: {
-        tools: { listChanged: true },
-        resources: { listChanged: true },
-        prompts: { listChanged: true },
-      },
+      capabilities: this.serverCapabilities(),
       serverInfo: this.serverInfo,
     };
   }
@@ -312,11 +339,20 @@ export class McpProtocolEngine {
     return result;
   }
 
-  private async handleToolsCall(params?: Record<string, any>, meta?: ClientMeta): Promise<any> {
+  private async handleToolsCall(params?: Record<string, any>, meta?: ClientMeta, outbound?: AirOutbound): Promise<any> {
     const toolName = params?.name;
     const args = params?.arguments || {};
     const inputResponses = params?.inputResponses;
     const requestState = params?.requestState;
+    const progressToken = params?._meta?.progressToken;
+    const channel: ToolCallChannel = {
+      outbound,
+      progressToken,
+      // 2026-07-28은 _meta로, 레거시는 initialize로 능력을 알린다
+      clientSupportsElicitation:
+        (meta?.clientCapabilities ?? this.clientCapabilities)?.elicitation !== undefined,
+      getLogLevel: () => this.logLevel,
+    };
 
     if (!toolName) {
       throw Object.assign(new Error('Missing required param: name'), { code: ErrorCodes.INVALID_PARAMS });
@@ -327,7 +363,7 @@ export class McpProtocolEngine {
       throw Object.assign(new Error(`Tool not found: ${toolName}`), { code: ErrorCodes.METHOD_NOT_FOUND });
     }
 
-    const content = await this.config.callTool(toolName, args, meta, inputResponses);
+    const content = await this.config.callTool(toolName, args, meta, inputResponses, channel);
 
     // MRTR: handler가 _inputRequired를 반환하면 input_required 응답
     if (content && typeof content === 'object' && '_inputRequired' in content && content._inputRequired) {

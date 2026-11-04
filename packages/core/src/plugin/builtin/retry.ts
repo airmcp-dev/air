@@ -9,6 +9,7 @@
 //     use: [retryPlugin({ maxRetries: 3, delayMs: 200 })],
 //   });
 
+import type { AirToolContext } from '../../types/tool.js';
 import type { AirPlugin } from '../../types/plugin.js';
 import type { AirMiddleware } from '../../types/middleware.js';
 
@@ -47,17 +48,21 @@ export function retryPlugin(options?: RetryOptions): AirPlugin {
         await new Promise((r) => setTimeout(r, delay));
 
         try {
-          const result = await ctx.tool.handler(ctx.params, {
+          // 원본 도구 컨텍스트(elicit/progress/log/signal 포함)를 그대로 쓴다. 없으면 최소 컨텍스트로 합성
+          const toolCtx: AirToolContext = ctx.meta._toolCtx ?? {
             requestId: ctx.requestId,
             serverName: ctx.serverName,
             startedAt: ctx.startedAt,
             state: ctx.meta._serverState || {},
+            progress: () => {},
+            log: () => {},
             requestInput: (msg: string, schema: any, rs?: string) => ({
               _inputRequired: true as const,
               inputRequests: [{ type: 'elicitation' as const, message: msg, requestedSchema: { type: 'object' as const, properties: schema } }],
               ...(rs ? { requestState: rs } : {}),
             }),
-          });
+          };
+          const result = await ctx.tool.handler(ctx.params, toolCtx);
           return result; // 성공 시 즉시 반환
         } catch (retryError) {
           lastError = retryError as Error;

@@ -8,6 +8,8 @@ const TINY_PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42m
 // Base64 인코딩된 짧은 오디오 (silence)
 const TINY_AUDIO_B64 = 'UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 const server = defineServer({
   name: 'air-conformance',
   version: '1.0.0',
@@ -60,7 +62,14 @@ const server = defineServer({
     defineTool('test_tool_with_logging', {
       description: 'A tool that logs during execution',
       params: {},
-      handler: async () => 'Logged and done',
+      handler: async (_params, ctx) => {
+        ctx.log('info', 'Tool execution started', 'test');
+        await sleep(50);
+        ctx.log('info', 'Tool processing data', 'test');
+        await sleep(50);
+        ctx.log('info', 'Tool execution completed', 'test');
+        return 'Logged and done';
+      },
     }),
     defineTool('test_error_handling', {
       description: 'A tool that throws an error',
@@ -72,56 +81,82 @@ const server = defineServer({
     defineTool('test_tool_with_progress', {
       description: 'A tool that reports progress',
       params: { steps: 'number?' },
-      handler: async ({ steps }) => {
+      handler: async ({ steps }, ctx) => {
         const s = steps ?? 3;
+        ctx.progress(0, 100);
+        await sleep(50);
+        ctx.progress(50, 100);
+        await sleep(50);
+        ctx.progress(100, 100);
         return `Completed ${s} steps`;
       },
     }),
     defineTool('test_sampling', {
       description: 'A tool that uses sampling',
-      params: {},
+      params: { prompt: 'string?' },
+      // sampling/createMessage는 아직 미지원 — 베이스라인에 기록됨
       handler: async () => 'Sampling result',
     }),
     defineTool('test_elicitation', {
       description: 'A tool that uses elicitation',
-      params: {},
-      handler: async (_params, ctx) => {
-        if (ctx.elicit) {
-          const result = await ctx.elicit('Please provide input', {
-            value: { type: 'string', description: 'A value' },
-          });
-          if (result.action === 'accept') return `Got: ${result.content?.value}`;
-          return 'Elicitation declined';
-        }
-        return 'No elicitation support';
+      params: { message: 'string?' },
+      handler: async ({ message }, ctx) => {
+        if (!ctx.elicit) return { content: [{ type: 'text', text: 'Client does not support elicitation' }], isError: true };
+        const result = await ctx.elicit(message ?? 'Please provide input', {
+          username: { type: 'string', description: "User's response", required: true },
+          email: { type: 'string', description: "User's email address", required: true },
+        });
+        return `User response: action=${result.action}, content=${JSON.stringify(result.content ?? {})}`;
       },
     }),
     defineTool('test_elicitation_sep1034_defaults', {
       description: 'Tests elicitation with defaults',
       params: {},
       handler: async (_params, ctx) => {
-        if (ctx.elicit) {
-          const result = await ctx.elicit('Provide defaults', {
-            name: { type: 'string', description: 'Name' },
-          });
-          if (result.action === 'accept') return `Name: ${result.content?.name}`;
-          return 'Declined';
-        }
-        return 'No elicitation';
+        if (!ctx.elicit) return { content: [{ type: 'text', text: 'Client does not support elicitation' }], isError: true };
+        const result = await ctx.elicit('Provide defaults', {
+          name: { type: 'string', description: 'User name', default: 'John Doe' },
+          age: { type: 'integer', description: 'User age', default: 30 },
+          score: { type: 'number', description: 'User score', default: 95.5 },
+          status: { type: 'string', description: 'User status', enum: ['active', 'inactive', 'pending'], default: 'active' },
+          verified: { type: 'boolean', description: 'Verified', default: true },
+        });
+        return `Elicitation completed: action=${result.action}, content=${JSON.stringify(result.content ?? {})}`;
       },
     }),
     defineTool('test_elicitation_sep1330_enums', {
       description: 'Tests elicitation with enums',
       params: {},
       handler: async (_params, ctx) => {
-        if (ctx.elicit) {
-          const result = await ctx.elicit('Choose color', {
-            color: { type: 'string', description: 'Color choice' },
-          });
-          if (result.action === 'accept') return `Color: ${result.content?.color}`;
-          return 'Declined';
-        }
-        return 'No elicitation';
+        if (!ctx.elicit) return { content: [{ type: 'text', text: 'Client does not support elicitation' }], isError: true };
+        // 세부 스키마(oneOf/array)가 필요하면 JSON Schema 객체를 그대로 넘긴다
+        const result = await ctx.elicit('Choose options', {
+          type: 'object',
+          properties: {
+            untitledSingle: { type: 'string', enum: ['option1', 'option2', 'option3'] },
+            titledSingle: {
+              type: 'string',
+              oneOf: [
+                { const: 'value1', title: 'First Option' },
+                { const: 'value2', title: 'Second Option' },
+                { const: 'value3', title: 'Third Option' },
+              ],
+            },
+            legacyEnum: { type: 'string', enum: ['opt1', 'opt2', 'opt3'], enumNames: ['Option One', 'Option Two', 'Option Three'] },
+            untitledMulti: { type: 'array', items: { type: 'string', enum: ['option1', 'option2', 'option3'] } },
+            titledMulti: {
+              type: 'array',
+              items: {
+                anyOf: [
+                  { const: 'value1', title: 'First Choice' },
+                  { const: 'value2', title: 'Second Choice' },
+                  { const: 'value3', title: 'Third Choice' },
+                ],
+              },
+            },
+          },
+        });
+        return `Elicitation completed: action=${result.action}, content=${JSON.stringify(result.content ?? {})}`;
       },
     }),
   ],

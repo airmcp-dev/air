@@ -10,11 +10,19 @@
 //   - MCP-Protocol-Version 헤더로 프로토콜 버전 전달
 //   - 단순 요청은 JSON 응답, 스트리밍이 필요하면 SSE 응답
 //   - 레거시 클라이언트(initialize)도 폴백 지원
+//
+// 서버 → 클라이언트 채널 (MCP 스펙 Streamable HTTP, "Sending Messages to the Server"):
+//   - 클라이언트가 Accept: text/event-stream을 보낸 tools/call은 응답을 SSE 스트림으로 연다.
+//     실행 중 notifications/progress·notifications/message, 서버발 요청(elicitation/create)을
+//     그 스트림에 흘리고, 마지막에 JSON-RPC 응답을 보낸 뒤 스트림을 닫는다.
+//   - 서버발 요청에 대한 클라이언트 응답은 별도 POST(JSON-RPC response)로 도착하며 id로 매칭한다.
+//   - Accept에 text/event-stream이 없으면 JSON 한 덩어리로 응답하고 알림은 보낼 수 없다.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { McpProtocolEngine, JsonRpcRequest } from './mcp-protocol.js';
 import { PROTOCOL_VERSIONS } from './mcp-protocol.js';
 import { checkOrigin } from './origin.js';
+import { PendingRequests, isJsonRpcResponse, type AirOutbound, type JsonRpcOutboundMessage } from './outbound.js';
 
 export interface AirHttpTransportOptions {
   /** MCP 엔드포인트 경로 (기본: '/mcp') */
@@ -33,12 +41,50 @@ export class AirHttpTransport {
   private endpoint: string;
   private corsOrigin: string;
   private allowedOrigins?: string[];
+  /** 서버가 보낸 요청(elicitation 등)의 응답 대기 — 클라이언트는 별도 POST로 답한다 */
+  private pending = new PendingRequests({ prefix: 'http' });
 
   constructor(engine: McpProtocolEngine, options?: AirHttpTransportOptions) {
     this.engine = engine;
     this.endpoint = options?.endpoint ?? '/mcp';
     this.corsOrigin = options?.corsOrigin ?? '*';
     this.allowedOrigins = options?.allowedOrigins;
+  }
+
+  /** 응답 하나를 SSE 스트림으로 열고, 그 위에 서버 → 클라이언트 채널을 만든다. */
+  private openStream(res: ServerResponse, responseVersion: string): { outbound: AirOutbound; close: (final: any) => void } {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'MCP-Protocol-Version': responseVersion,
+    });
+    res.flushHeaders?.();
+
+    let open = true;
+    const write = (message: any) => {
+      if (!open || res.destroyed) return;
+      res.write(`event: message\ndata: ${JSON.stringify(message)}\n\n`);
+    };
+    res.on('close', () => { open = false; });
+
+    const outbound: AirOutbound = {
+      notify: (method, params) => write({ jsonrpc: '2.0', method, ...(params ? { params } : {}) }),
+      request: (method, params) =>
+        this.pending.send(method, params, (msg: JsonRpcOutboundMessage) => {
+          if (!open) throw new Error('SSE stream closed before the request could be sent');
+          write(msg);
+        }),
+    };
+
+    return {
+      outbound,
+      close: (final: any) => {
+        write(final);
+        open = false;
+        res.end();
+      },
+    };
   }
 
   /**
@@ -155,6 +201,13 @@ export class AirHttpTransport {
       return;
     }
 
+    // 클라이언트가 보낸 JSON-RPC 응답 — 서버발 요청(elicitation 등)의 답. 202로 받는다.
+    if (isJsonRpcResponse(body)) {
+      this.pending.resolve(body);
+      res.writeHead(202).end();
+      return;
+    }
+
     // 단일 요청
     const message = body as JsonRpcRequest;
 
@@ -182,7 +235,16 @@ export class AirHttpTransport {
       return;
     }
 
-    // 일반 요청
+    // tools/call + Accept: text/event-stream → SSE 스트림으로 응답 (실행 중 알림·서버발 요청 가능)
+    const accept = String(req.headers.accept ?? '');
+    if (message.method === 'tools/call' && accept.includes('text/event-stream')) {
+      const stream = this.openStream(res, responseVersion);
+      const response = await this.engine.handleMessage(message, stream.outbound);
+      stream.close(response);
+      return;
+    }
+
+    // 일반 요청 — JSON 한 덩어리
     const response = await this.engine.handleMessage(message);
 
     res.writeHead(200, {

@@ -154,8 +154,46 @@ interface AirToolContext {
   serverName: string;         // defineServer의 name
   startedAt: number;          // Date.now()
   state: Record<string, any>; // server.state와 동일 참조
+  signal?: AbortSignal;       // 취소 시그널
+
+  // 서버 → 클라이언트 채널 (v0.6.0+)
+  progress: (progress: number, total?: number, message?: string) => void;
+  log: (level: AirLogLevel, data: any, logger?: string) => void;
+  elicit?: (message: string, schema: AirElicitSchema | AirElicitJsonSchema) => Promise<AirElicitResult>;
 }
 ```
+
+### 실행 중 클라이언트에 말 걸기 (v0.6.0+)
+
+도구가 실행되는 동안 알림을 보내거나 사용자에게 입력을 요청할 수 있습니다. 요청이 들어온 연결을 그대로 씁니다: stdio 스트림, SSE 세션, Streamable HTTP는 클라이언트가 `Accept: text/event-stream`을 보냈을 때 air가 여는 SSE 응답 스트림.
+
+```typescript
+defineTool('import', {
+  params: { url: 'string' },
+  handler: async ({ url }, ctx) => {
+    ctx.log('info', `${url} 가져오는 중`, 'import');
+
+    for (let i = 0; i < 4; i++) {
+      await step(i);
+      ctx.progress(i + 1, 4, `${i + 1}단계`);   // notifications/progress
+    }
+
+    if (ctx.elicit) {                              // 클라이언트가 elicitation 미지원이면 undefined
+      const answer = await ctx.elicit('기존 행을 덮어쓸까요?', {
+        overwrite: { type: 'boolean', required: true, default: false },
+      });
+      if (answer.action !== 'accept' || !answer.content?.overwrite) return '취소됨';
+    }
+    return '가져오기 완료';
+  },
+});
+```
+
+- `ctx.progress`는 클라이언트가 요청 `_meta`에 `progressToken`을 넣었을 때만 전송되고, 아니면 no-op입니다.
+- `ctx.log`는 클라이언트가 `logging/setLevel`로 정한 레벨을 따릅니다 (RFC 5424 순: `debug` < `info` < `notice` < `warning` < `error` < `critical` < `alert` < `emergency`).
+- `ctx.elicit`은 transport가 양방향이고 클라이언트가 `elicitation` 능력을 선언했을 때만 정의됩니다. 단축형 스키마는 JSON Schema 객체로 변환되며, `oneOf`나 배열 같은 세부가 필요하면 `{ type: 'object', properties, required }`를 그대로 넘기세요.
+- Cloudflare Workers transport에는 채널이 없습니다: `progress`/`log`는 no-op, `elicit`은 `undefined`.
+- SSE를 받지 않는 클라이언트(`Accept`에 `text/event-stream` 없음)도 최종 결과는 받고, 알림만 버려집니다.
 
 ### 동기/비동기
 

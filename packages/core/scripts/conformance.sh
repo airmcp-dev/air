@@ -21,7 +21,12 @@ if ! curl -sf "http://127.0.0.1:${PORT}/health" > /dev/null 2>&1; then
   echo "conformance server failed to start:"; cat /tmp/air-conformance-server.log; exit 1
 fi
 
+# 매 실행마다 새 결과만 판정하도록 비운다
+rm -rf "$OUT_DIR"
+
+# 스위트 자체의 exit code는 무시하고(WARNING-only 시나리오 판정이 일관적이지 않음) 결과 JSON을 직접 판정한다
 npx -y @modelcontextprotocol/conformance server \
   --url "http://localhost:${PORT}/mcp" \
-  --expected-failures __tests__/conformance-baseline.yml \
-  -o "$OUT_DIR"
+  -o "$OUT_DIR" || true
+
+node scripts/conformance-gate.mjs "$OUT_DIR" __tests__/conformance-baseline.yml

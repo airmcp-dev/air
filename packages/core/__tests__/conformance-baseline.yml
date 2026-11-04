@@ -1,13 +1,5 @@
 # MCP conformance suite — 알려진 실패 (베이스라인)
 # 실행: pnpm --filter @airmcp-dev/core conformance
 # 아래 항목이 통과로 바뀌면 스위트가 "stale"로 알려주니 여기서 지운다.
-#
-# 전부 서버→클라이언트 채널(Streamable HTTP 응답 SSE 스트림) 미구현에서 비롯됨.
 server:
-  - server-sse-multiple-streams  # GET /mcp SSE 스트림 미제공 (체크 0건 → 실패 취급)
-  - tools-call-with-logging      # notifications/message
-  - tools-call-with-progress     # notifications/progress
-  - tools-call-sampling          # sampling/createMessage (서버발 요청)
-  - tools-call-elicitation       # elicitation/create (서버발 요청)
-  - elicitation-sep1034-defaults
-  - elicitation-sep1330-enums
+  - tools-call-sampling  # sampling/createMessage (서버가 클라이언트 LLM 호출을 위임) — 미구현, 보류

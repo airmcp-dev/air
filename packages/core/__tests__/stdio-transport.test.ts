@@ -153,7 +153,50 @@ describe('AirStdioTransport — full client handshake (raw)', () => {
 
     const byId = Object.fromEntries((await server.waitForLines(3)).map((r) => [r.id, r]));
     expect(byId[10].result.serverInfo).toMatchObject({ name: 'stdio-test', version: '1.0.0' });
-    expect(byId[11].result.tools.map((t: any) => t.name)).toEqual(['echo']);
+    expect(byId[11].result.tools.map((t: any) => t.name)).toEqual(['echo', 'ask']);
     expect(byId[12].result.content).toEqual([{ type: 'text', text: 'hello over stdio' }]);
+  });
+});
+
+describe('AirStdioTransport — server → client channel', () => {
+  it('should send progress/log notifications and an elicitation request, then resume on the client reply', async () => {
+    const server = startServer();
+    server.write(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 20,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-11-25',
+          capabilities: { elicitation: {} },
+          clientInfo: { name: 'raw', version: '0' },
+        },
+      }) + '\n',
+    );
+    server.write(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 21,
+        method: 'tools/call',
+        params: { name: 'ask', arguments: {}, _meta: { progressToken: 'pt' } },
+      }) + '\n',
+    );
+
+    // initialize 응답 + progress + log + elicitation/create 요청
+    const lines = await server.waitForLines(4);
+    const methods = lines.map((l) => l.method ?? `response:${l.id}`);
+    expect(methods).toEqual(['response:20', 'notifications/progress', 'notifications/message', 'elicitation/create']);
+    expect(lines[1].params).toEqual({ progressToken: 'pt', progress: 1, total: 2 });
+    expect(lines[2].params).toEqual({ level: 'info', data: 'asking' });
+    const request = lines[3];
+    expect(request.params.message).toBe('Name?');
+
+    // 클라이언트 응답을 stdin으로
+    server.write(
+      JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { action: 'accept', content: { name: 'Lin' } } }) + '\n',
+    );
+    const [, , , , final] = await server.waitForLines(5);
+    expect(final.id).toBe(21);
+    expect(final.result.content).toEqual([{ type: 'text', text: 'accept:Lin' }]);
   });
 });

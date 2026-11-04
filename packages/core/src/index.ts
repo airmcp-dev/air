@@ -89,6 +89,8 @@ export type {
   AirToolDef,
   AirToolAnnotations,
   AirElicitSchema,
+  AirElicitJsonSchema,
+  AirLogLevel,
   AirElicitResult,
   AirResourceLink,
   AirResourceDef,
@@ -121,3 +123,7 @@ export type {
   AirServer,
   AirServerStatus,
 } from './types/index.js';
+
+// 서버 → 클라이언트 채널 (커스텀 transport용)
+export type { AirOutbound } from './protocol/outbound.js';
+export { PendingRequests, isJsonRpcResponse } from './protocol/outbound.js';

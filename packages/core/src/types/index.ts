@@ -11,6 +11,8 @@ export type {
   AirToolDef,
   AirToolAnnotations,
   AirElicitSchema,
+  AirElicitJsonSchema,
+  AirLogLevel,
   AirElicitResult,
   AirResourceLink,
 } from './tool.js';

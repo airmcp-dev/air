@@ -124,6 +124,12 @@ defineServer({
 });
 ```
 
+### Server → client messages (v0.6.0+)
+
+A `tools/call` whose request carries `Accept: text/event-stream` is answered with an SSE stream instead of one JSON body. While the tool runs, air writes `notifications/progress`, `notifications/message` and server-initiated requests such as `elicitation/create` to that stream, then the final JSON-RPC response, then closes it. The client answers a server request by `POST`ing the JSON-RPC response to the same endpoint (air replies `202`). Clients that only accept `application/json` get the final result as before; notifications are dropped. See [Tools → Talking back to the client](./tools#talking-back-to-the-client-v060).
+
+`GET /mcp` does not open a standalone server-initiated stream (it returns `server/discover`), so there is no channel outside a request.
+
 Each session gets a unique ID via `crypto.randomUUID()`.
 
 ## Cloudflare Workers
