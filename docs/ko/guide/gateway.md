@@ -54,7 +54,7 @@ interface GatewayOptions {
   balancer?: BalancerStrategy;    // 'round-robin' | 'random' | 'weighted'
   requestTimeout?: number;        // upstream 호출당 ms, 기본: 30000
   discoverOnStart?: boolean;      // 기본: true
-  pendingTtlMs?: number;          // 클라이언트의 elicitation 응답 대기 시간, 기본: 5분
+  secret?: string;                // elicitation id 서명 키. 게이트웨이를 여러 대 띄우면 같은 값으로
 }
 ```
 
@@ -91,7 +91,7 @@ await gateway.discover('files');  // 하나만
 
 클라이언트가 `Accept: text/event-stream`으로 `tools/call`을 보내면 Gateway도 같은 방식으로 백엔드를 호출하고, 백엔드 SSE 스트림의 이벤트를 전부 클라이언트 스트림으로 중계합니다: `notifications/progress`, `notifications/message`, 그리고 `elicitation/create` 같은 서버발 요청. 최종 JSON-RPC 응답이 스트림을 닫습니다.
 
-서버발 요청은 백엔드 id가 충돌할 수 있어서 Gateway 범위의 id(`gw-N`)로 바뀝니다. 클라이언트는 단일 서버에 하듯 Gateway 엔드포인트로 JSON-RPC 응답을 `POST`하면 되고, Gateway가 id를 되돌려 요청한 백엔드로 전달합니다. 답이 없는 요청은 `pendingTtlMs` 뒤 버려집니다.
+서버발 요청은 백엔드와 원래 id를 담아 `secret`으로 서명한 `gw.<backend>.<id>.<hmac>` 형식의 Gateway id로 바뀝니다. 클라이언트는 단일 서버에 하듯 Gateway 엔드포인트로 JSON-RPC 응답을 `POST`하면 되고, Gateway가 서명을 확인해 요청한 백엔드로 전달합니다. 아무것도 저장하지 않으므로 `secret`만 같으면 어느 Gateway 인스턴스든 응답을 처리할 수 있습니다.
 
 `application/json`만 받는 클라이언트는 최종 결과만 받습니다. 백엔드도 JSON 모드로 호출되므로 알림을 보내지 않고 `ctx.elicit`은 `undefined`입니다.
 

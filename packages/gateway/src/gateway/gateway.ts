@@ -22,6 +22,7 @@ import { HealthChecker } from '../registry/health-checker.js';
 import { RequestRouter } from '../router/request-router.js';
 import { LoadBalancer } from '../router/load-balancer.js';
 import { UpstreamClient, type JsonRpcResponse } from './upstream.js';
+import { GatewayRequestIds } from './request-id.js';
 
 export interface GatewayServerRegistration {
   id: string;
@@ -41,15 +42,12 @@ export interface GatewayOptions extends GatewayConfig {
   allowedOrigins?: string[];
   /** start() 시 하위 서버 목록을 발견할지 (기본: true) */
   discoverOnStart?: boolean;
-  /** 서버발 요청(elicitation 등)에 대한 클라이언트 응답 대기 시간 (ms, 기본: 5분) */
-  pendingTtlMs?: number;
-}
-
-/** 하위 서버가 보낸 요청(elicitation 등) → 클라이언트 응답을 되돌릴 곳 */
-interface PendingUpstreamRequest {
-  upstream: UpstreamClient;
-  upstreamId: string | number;
-  timer: ReturnType<typeof setTimeout>;
+  /**
+   * 서버발 요청 id 서명 키. 게이트웨이를 여러 대 띄우면 같은 값을 주어야
+   * 한 인스턴스가 만든 elicitation id에 대한 클라이언트 응답을 다른 인스턴스가 처리할 수 있다.
+   * 없으면 프로세스마다 임의 키 (단일 인스턴스용).
+   */
+  secret?: string;
 }
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
@@ -62,7 +60,7 @@ export class Gateway {
   readonly healthChecker: HealthChecker;
 
   private readonly config: Required<Pick<GatewayConfig, 'name' | 'port' | 'healthCheckInterval' | 'balancer' | 'requestTimeout'>> &
-    Required<Pick<GatewayOptions, 'host' | 'endpoint' | 'discoverOnStart' | 'pendingTtlMs'>> &
+    Required<Pick<GatewayOptions, 'host' | 'endpoint' | 'discoverOnStart'>> &
     Pick<GatewayOptions, 'allowedOrigins'>;
   private upstreams = new Map<string, UpstreamClient>();
   /** 발견한 리소스·프롬프트 → 제공 서버 id */
@@ -70,9 +68,8 @@ export class Gateway {
   private promptOwners = new Map<string, string[]>();
   private resourceTemplateOwners = new Map<string, string[]>();
   private discovered = new Map<string, { resources: any[]; prompts: any[]; resourceTemplates: any[] }>();
-  /** 서버발 요청 id 매핑 (gateway id → upstream) */
-  private pending = new Map<string, PendingUpstreamRequest>();
-  private pendingSeq = 0;
+  /** 서버발 요청 id ↔ 게이트웨이 id (stateless, HMAC) */
+  private readonly ids: GatewayRequestIds;
   private server: Server | null = null;
   /** initialize에서 받은 클라이언트 능력 — 하위 서버에 _meta로 전달 */
   private clientCapabilities: Record<string, any> = {};
@@ -89,8 +86,8 @@ export class Gateway {
       requestTimeout: options.requestTimeout ?? 30_000,
       allowedOrigins: options.allowedOrigins,
       discoverOnStart: options.discoverOnStart ?? true,
-      pendingTtlMs: options.pendingTtlMs ?? 5 * 60_000,
     };
+    this.ids = new GatewayRequestIds(options.secret);
     this.balancer = new LoadBalancer(this.config.balancer as BalancerStrategy);
     this.router = new RequestRouter(this.registry, this.toolIndex, this.balancer);
     this.healthChecker = new HealthChecker(this.registry, this.config.healthCheckInterval);
@@ -196,8 +193,6 @@ export class Gateway {
 
   async stop(): Promise<void> {
     this.healthChecker.stop();
-    for (const p of this.pending.values()) clearTimeout(p.timer);
-    this.pending.clear();
     if (this.server) {
       await new Promise<void>((resolve) => this.server!.close(() => resolve()));
       this.server = null;
@@ -215,7 +210,6 @@ export class Gateway {
       name: this.config.name,
       servers: this.registry.size,
       tools: this.toolIndex.size,
-      pendingRequests: this.pending.size,
       health: this.healthChecker.getAllResults(),
     };
   }
@@ -482,11 +476,8 @@ export class Gateway {
         signal: abort.signal,
         onEvent: (message) => {
           if (message && typeof message === 'object' && 'method' in message && message.id !== undefined) {
-            // 하위 서버발 요청 → id를 게이트웨이 id로 바꿔 매핑
-            const gatewayId = `gw-${++this.pendingSeq}`;
-            const timer = setTimeout(() => this.pending.delete(gatewayId), this.config.pendingTtlMs);
-            this.pending.set(gatewayId, { upstream, upstreamId: message.id, timer });
-            write({ ...message, id: gatewayId });
+            // 하위 서버발 요청 → 백엔드와 원래 id를 담은 서명된 게이트웨이 id로 (저장소 없음)
+            write({ ...message, id: this.ids.encode(server.id, message.id) });
             return;
           }
           // 알림은 그대로
@@ -501,14 +492,18 @@ export class Gateway {
     res.end();
   }
 
-  /** 클라이언트가 보낸 JSON-RPC 응답을 원래 하위 서버로 되돌린다. */
+  /**
+   * 클라이언트가 보낸 JSON-RPC 응답을 원래 하위 서버로 되돌린다.
+   * id에 백엔드와 원래 id가 서명돼 들어 있으므로 어느 게이트웨이 인스턴스든 처리할 수 있다.
+   * 서명이 맞지 않거나 모르는 백엔드면 무시한다 (202로 받되 전달하지 않음).
+   */
   private async forwardClientResponse(message: { id: string | number; result?: any; error?: any }): Promise<void> {
-    const entry = this.pending.get(String(message.id));
-    if (!entry) return; // 모르는 id — 만료됐거나 잘못된 응답. 202로 받고 무시
-    clearTimeout(entry.timer);
-    this.pending.delete(String(message.id));
-    await entry.upstream.reply({
-      id: entry.upstreamId,
+    const decoded = this.ids.decode(message.id);
+    if (!decoded) return;
+    const upstream = this.upstreams.get(decoded.backendId);
+    if (!upstream) return;
+    await upstream.reply({
+      id: decoded.upstreamId,
       ...(message.error ? { error: message.error } : { result: message.result }),
     });
   }

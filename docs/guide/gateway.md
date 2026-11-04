@@ -54,7 +54,7 @@ interface GatewayOptions {
   balancer?: BalancerStrategy;    // 'round-robin' | 'random' | 'weighted'
   requestTimeout?: number;        // ms per upstream call, default: 30000
   discoverOnStart?: boolean;      // default: true
-  pendingTtlMs?: number;          // how long to wait for a client's elicitation reply, default: 5 min
+  secret?: string;                // HMAC key for elicitation ids; share it across gateway instances
 }
 ```
 
@@ -91,7 +91,7 @@ await gateway.discover('files');  // one backend
 
 When a client sends `tools/call` with `Accept: text/event-stream`, Gateway calls the backend the same way and relays every event on the backend's SSE stream to the client's stream: `notifications/progress`, `notifications/message`, and server-initiated requests such as `elicitation/create`. The final JSON-RPC response ends the stream.
 
-Server-initiated requests get a Gateway-scoped id (`gw-N`) because backend ids can collide. The client answers by `POST`ing the JSON-RPC response to the Gateway endpoint, exactly as it would to a single server; Gateway maps the id back and forwards the response to the backend that asked. Unanswered requests are dropped after `pendingTtlMs`.
+Server-initiated requests get a Gateway id of the form `gw.<backend>.<id>.<hmac>` that carries the backend and the original id, signed with `secret`. The client answers by `POST`ing the JSON-RPC response to the Gateway endpoint, exactly as it would to a single server; Gateway verifies the signature and forwards the response to the backend that asked. Nothing is stored, so with a shared `secret` any Gateway instance can handle the reply.
 
 Clients that only accept `application/json` get the final result; the backend is called in JSON mode, so it sends no notifications and sees `ctx.elicit` as `undefined`.
 

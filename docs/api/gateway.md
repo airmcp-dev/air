@@ -28,7 +28,7 @@ interface GatewayOptions {
   balancer?: BalancerStrategy;    // default: 'round-robin'
   requestTimeout?: number;        // ms per upstream call, default: 30000
   discoverOnStart?: boolean;      // default: true
-  pendingTtlMs?: number;          // ms to keep an unanswered elicitation, default: 300000
+  secret?: string;                // HMAC key for elicitation ids; share it across gateway instances
 }
 ```
 

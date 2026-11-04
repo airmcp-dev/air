@@ -113,7 +113,9 @@ const rpc = (id: number, method: string, params?: any) => ({ jsonrpc: '2.0', id,
 describe('Gateway — Streamable HTTP front', () => {
   const A = backend('A', PORT_A);
   const B = backend('B', PORT_B);
-  const gateway = new Gateway({ name: 'gw-test', port: 0, healthCheckInterval: 60_000, requestTimeout: 5_000 });
+  const gateway = new Gateway({ name: 'gw-test', port: 0, healthCheckInterval: 60_000, requestTimeout: 5_000, secret: 'shared-secret' });
+  // 같은 secret을 가진 두 번째 인스턴스 — elicitation 응답을 대신 받을 수 있어야 한다
+  const peer = new Gateway({ name: 'gw-peer', port: 0, healthCheckInterval: 60_000, requestTimeout: 5_000, secret: 'shared-secret', discoverOnStart: false });
 
   beforeAll(async () => {
     await Promise.all([A.start(), B.start()]);
@@ -121,10 +123,12 @@ describe('Gateway — Streamable HTTP front', () => {
     gateway.register({ id: 'a', name: 'A', connection: { type: 'http', url: `http://127.0.0.1:${PORT_A}/mcp` } });
     gateway.register({ id: 'b', name: 'B', connection: { type: 'http', url: `http://127.0.0.1:${PORT_B}/mcp` } });
     await gateway.start();
+    peer.register({ id: 'a', name: 'A', connection: { type: 'http', url: `http://127.0.0.1:${PORT_A}/mcp` } });
+    await peer.start();
   }, 20_000);
 
   afterAll(async () => {
-    await gateway.stop();
+    await Promise.all([gateway.stop(), peer.stop()]);
     await Promise.all([A.stop(), B.stop()]);
   });
 
@@ -174,14 +178,38 @@ describe('Gateway — Streamable HTTP front', () => {
   it('should relay elicitation: rewrite the id and forward the client reply to the backend', async () => {
     const res = await post(gateway.port, rpc(40, 'tools/call', { name: 'work', arguments: { ask: true } }), undefined, (ev) => {
       if (ev.method !== 'elicitation/create') return;
-      expect(String(ev.id)).toMatch(/^gw-\d+$/);
+      expect(String(ev.id)).toMatch(/^gw\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{22}$/);
       expect(ev.params.message).toBe('Confirm?');
       void post(gateway.port, { jsonrpc: '2.0', id: ev.id, result: { action: 'accept', content: { ok: true } } }, 'application/json');
     });
     const methods = res.events.map((e) => e.method ?? 'response');
     expect(methods).toContain('elicitation/create');
     expect(res.events.at(-1).result.content[0].text).toBe('accept:true');
-    expect(gateway.status().pendingRequests).toBe(0);
+  });
+
+  it('should let another gateway instance with the same secret forward the elicitation reply', async () => {
+    const res = await post(gateway.port, rpc(41, 'tools/call', { name: 'work', arguments: { ask: true } }), undefined, (ev) => {
+      if (ev.method !== 'elicitation/create') return;
+      // 응답을 첫 인스턴스가 아니라 피어에게 보낸다
+      void post(peer.port, { jsonrpc: '2.0', id: ev.id, result: { action: 'decline' } }, 'application/json');
+    });
+    expect(res.events.at(-1).result.content[0].text).toBe('decline:undefined');
+  });
+
+  it('should ignore a forged or tampered elicitation reply id', async () => {
+    let elicitId = '';
+    const done = post(gateway.port, rpc(42, 'tools/call', { name: 'work', arguments: { ask: true } }), undefined, async (ev) => {
+      if (ev.method !== 'elicitation/create') return;
+      elicitId = ev.id;
+      // 서명을 망가뜨린 id → 무시돼야 한다 (202지만 전달 안 됨)
+      const forged = elicitId.replace(/.{4}$/, 'xxxx');
+      const r = await post(gateway.port, { jsonrpc: '2.0', id: forged, result: { action: 'accept', content: { ok: false } } }, 'application/json');
+      expect(r.status).toBe(202);
+      // 그 다음 진짜 응답
+      void post(gateway.port, { jsonrpc: '2.0', id: elicitId, result: { action: 'accept', content: { ok: true } } }, 'application/json');
+    });
+    const res = await done;
+    expect(res.events.at(-1).result.content[0].text).toBe('accept:true');
   });
 
   it('should answer in plain JSON (no notifications) when the client does not accept SSE', async () => {
@@ -205,7 +233,7 @@ describe('Gateway — Streamable HTTP front', () => {
   });
 
   it('should accept an unknown client response with 202', async () => {
-    const res = await post(gateway.port, { jsonrpc: '2.0', id: 'gw-999999', result: {} }, 'application/json');
+    const res = await post(gateway.port, { jsonrpc: '2.0', id: 'gw.unknown.id.sig', result: {} }, 'application/json');
     expect(res.status).toBe(202);
   });
 

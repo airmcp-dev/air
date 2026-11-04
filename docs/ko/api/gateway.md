@@ -29,7 +29,7 @@ interface GatewayOptions {
   balancer?: BalancerStrategy;    // 기본: 'round-robin'
   requestTimeout?: number;        // upstream 호출당 ms, 기본: 30000
   discoverOnStart?: boolean;      // 기본: true
-  pendingTtlMs?: number;          // 답 없는 elicitation 보관 시간 ms, 기본: 300000
+  secret?: string;                // elicitation id 서명 키. 게이트웨이를 여러 대 띄우면 같은 값으로
 }
 ```
 

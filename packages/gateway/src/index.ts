@@ -4,7 +4,7 @@
 // ── Proxy ──
 export { Gateway } from './gateway/index.js';
 export type { GatewayOptions, GatewayServerRegistration } from './gateway/index.js';
-export { UpstreamClient, readSseStream, parseSseBlock } from './gateway/index.js';
+export { UpstreamClient, GatewayRequestIds, readSseStream, parseSseBlock } from './gateway/index.js';
 export type { UpstreamCallOptions, UpstreamDiscovery, SseEvent } from './gateway/index.js';
 export { McpProxy } from './proxy/index.js';
 export { SessionPool } from './proxy/index.js';
