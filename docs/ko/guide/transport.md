@@ -108,7 +108,7 @@ defineServer({
 | 메서드 | 설명 |
 |--------|------|
 | `POST` | MCP 메시지 처리 |
-| `GET` | `/`: 서버 상태 JSON 반환. `/mcp`: `405` (서버 발신 SSE 스트림 없음) |
+| `GET` | `/`: 서버 상태 JSON 반환. `/mcp`: `server/discover` 단축 응답 |
 | `DELETE` | 세션 종료 |
 
 기본으로 `127.0.0.1`에만 바인딩하고, `Origin` 헤더가 localhost 출처가 아닌 요청에는 `403`을 돌려줍니다 (MCP 스펙의 DNS rebinding 방지). 컨테이너나 원격 클라이언트에서 접속하려면 `host`를, 다른 출처의 브라우저 클라이언트를 받으려면 `allowedOrigins`를 지정합니다:

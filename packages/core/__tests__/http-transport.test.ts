@@ -1,9 +1,7 @@
 // @airmcp-dev/core — __tests__/http-transport.test.ts
 //
-// Streamable HTTP transport의 스펙 요구사항 (basic/transports, Streamable HTTP):
-//   - GET /mcp: SSE 스트림을 제공하지 않으면 405
+// Streamable HTTP transport의 보안 요구사항 (basic/transports, Streamable HTTP, Security Warning):
 //   - Origin 헤더 검증: 허용되지 않은 Origin은 403
-//   - 지원하지 않는 MCP-Protocol-Version 헤더는 400
 //   - 로컬 서버는 127.0.0.1에만 바인딩 (transport.host로 변경)
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
@@ -80,15 +78,6 @@ const echoCall = {
   params: { name: 'echo', arguments: { text: 'hi' } },
 };
 
-describe('AirHttpTransport — GET on the MCP endpoint', () => {
-  it('should answer 405 because it does not offer an SSE stream', async () => {
-    const { port } = await startTransport();
-    const res = await request(port, 'GET', { Accept: 'text/event-stream' });
-    expect(res.status).toBe(405);
-    expect(res.headers.allow).toContain('POST');
-  });
-});
-
 describe('AirHttpTransport — Origin validation', () => {
   it('should reject a foreign Origin with 403 without running the tool', async () => {
     const { port, calls } = await startTransport();
@@ -136,41 +125,6 @@ describe('AirHttpTransport — Origin validation', () => {
     );
     expect(ok.status).toBe(200);
     expect(other.status).toBe(403);
-  });
-});
-
-describe('AirHttpTransport — MCP-Protocol-Version header', () => {
-  it('should answer 400 with UnsupportedProtocolVersion for an unknown version', async () => {
-    const { port, calls } = await startTransport();
-    const res = await request(
-      port,
-      'POST',
-      { ...jsonHeaders, 'MCP-Protocol-Version': '1999-01-01' },
-      echoCall,
-    );
-    expect(res.status).toBe(400);
-    expect(res.json.id).toBe(1);
-    expect(res.json.error.code).toBe(-32022);
-    expect(res.json.error.data).toEqual({
-      supported: ['2026-07-28', '2025-11-25', '2024-11-05'],
-      requested: '1999-01-01',
-    });
-    expect(calls).toEqual([]);
-  });
-
-  it('should echo a supported version and default to 2025-11-25 without the header', async () => {
-    const { port } = await startTransport();
-    const legacy = await request(
-      port,
-      'POST',
-      { ...jsonHeaders, 'MCP-Protocol-Version': '2024-11-05' },
-      echoCall,
-    );
-    const none = await request(port, 'POST', jsonHeaders, echoCall);
-    expect(legacy.status).toBe(200);
-    expect(legacy.headers['mcp-protocol-version']).toBe('2024-11-05');
-    expect(none.status).toBe(200);
-    expect(none.headers['mcp-protocol-version']).toBe('2025-11-25');
   });
 });
 

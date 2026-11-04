@@ -108,7 +108,7 @@ defineServer({
 | Method | Description |
 |--------|-------------|
 | `POST` | MCP message handling |
-| `GET` | `/`: server status JSON. `/mcp`: `405` (no server-initiated SSE stream) |
+| `GET` | `/`: server status JSON. `/mcp`: `server/discover` shortcut |
 | `DELETE` | Session termination |
 
 By default the server listens on `127.0.0.1` only and answers `403` to a request whose `Origin` header is not a localhost origin (MCP spec, DNS rebinding protection). For a container or remote clients, set `host`; for browser clients on another origin, list them in `allowedOrigins`:

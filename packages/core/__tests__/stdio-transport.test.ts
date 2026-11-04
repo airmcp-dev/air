@@ -3,15 +3,13 @@
 // stdio transport 프레이밍 E2E — MCP 스펙(basic/transports, stdio)의 줄 단위 JSON.
 // 픽스처 서버(fixtures/stdio-server.mjs)를 실제 프로세스로 띄워서 확인한다.
 //   1. 원시 바이트: JSON 한 줄을 보내면 stdout으로 JSON 한 줄이 돌아오는지
-//   2. 공식 MCP SDK StdioClientTransport: initialize → tools/list → tools/call
+//   2. 클라이언트 핸드셰이크 전체: initialize → initialized → tools/list → tools/call (SDK 없이 raw로)
 
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = join(here, 'fixtures', 'stdio-server.mjs');
@@ -138,29 +136,24 @@ describe('AirStdioTransport — newline-delimited JSON', () => {
   });
 });
 
-describe('AirStdioTransport — official MCP SDK client', () => {
-  it('should initialize, list tools, and call a tool over StdioClientTransport', async () => {
-    const transport = new StdioClientTransport({
-      command: process.execPath,
-      args: [fixture],
-      stderr: 'ignore',
-    });
-    const client = new Client({ name: 'air-stdio-e2e', version: '1.0.0' });
+describe('AirStdioTransport — full client handshake (raw)', () => {
+  it('should initialize, list tools, and call a tool over newline-delimited JSON', async () => {
+    const server = startServer();
+    server.write(initialize(10) + '\n');
+    server.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
+    server.write(JSON.stringify({ jsonrpc: '2.0', id: 11, method: 'tools/list' }) + '\n');
+    server.write(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 12,
+        method: 'tools/call',
+        params: { name: 'echo', arguments: { text: 'hello over stdio' } },
+      }) + '\n',
+    );
 
-    try {
-      await client.connect(transport, { timeout: 10_000 });
-      expect(client.getServerVersion()).toMatchObject({ name: 'stdio-test', version: '1.0.0' });
-
-      const { tools } = await client.listTools();
-      expect(tools.map((t) => t.name)).toEqual(['echo']);
-
-      const result = await client.callTool({
-        name: 'echo',
-        arguments: { text: 'hello over stdio' },
-      });
-      expect(result.content).toEqual([{ type: 'text', text: 'hello over stdio' }]);
-    } finally {
-      await client.close();
-    }
-  }, 30_000);
+    const byId = Object.fromEntries((await server.waitForLines(3)).map((r) => [r.id, r]));
+    expect(byId[10].result.serverInfo).toMatchObject({ name: 'stdio-test', version: '1.0.0' });
+    expect(byId[11].result.tools.map((t: any) => t.name)).toEqual(['echo']);
+    expect(byId[12].result.content).toEqual([{ type: 'text', text: 'hello over stdio' }]);
+  });
 });
