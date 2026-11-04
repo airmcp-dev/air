@@ -60,6 +60,27 @@ export interface GatewayOptions extends GatewayConfig {
     /** false면 /registry를 열지 않는다 (기본: true) */
     enabled?: boolean;
   };
+  /**
+   * 다른 게이트웨이 인스턴스 목록. 주기적으로 서로의 백엔드 목록을 교환해(gossip) 어느 한 곳에 등록된 백엔드를
+   * 전부가 알게 된다. 인증은 registration.token을 그대로 쓴다. 피어가 꺼져 있어도 동작엔 영향 없다.
+   */
+  peers?: string[];
+  /** 피어 동기화 주기 ms (기본: 5000) */
+  peerSyncMs?: number;
+}
+
+/** GET /peers/state 응답의 백엔드 항목 */
+export interface PeerBackendState {
+  id: string;
+  name: string;
+  url: string;
+  headers?: Record<string, string>;
+  weight?: number;
+  status: string;
+  tools: ToolEntry[];
+  resources: any[];
+  prompts: any[];
+  resourceTemplates: any[];
 }
 
 /** POST /registry 본문 */
@@ -97,6 +118,13 @@ export class Gateway {
   private lastSeen = new Map<string, number>();
   private sweeper: ReturnType<typeof setInterval> | null = null;
   private readonly registration: { enabled: boolean; token?: string; staleAfterMs: number };
+  private readonly peers: string[];
+  private readonly peerSyncMs: number;
+  private peerTimer: ReturnType<typeof setInterval> | null = null;
+  private peerState = new Map<string, 'up' | 'down'>();
+  /** 피어에게서 배운 백엔드의 마지막 확인 시각 */
+  private peerSeen = new Map<string, number>();
+  private weights = new Map<string, number>();
   private server: Server | null = null;
   /** initialize에서 받은 클라이언트 능력 — 하위 서버에 _meta로 전달 */
   private clientCapabilities: Record<string, any> = {};
@@ -120,6 +148,8 @@ export class Gateway {
       token: options.registration?.token,
       staleAfterMs: options.registration?.staleAfterMs ?? 30_000,
     };
+    this.peers = (options.peers ?? []).map((u) => u.replace(/\/+$/, ''));
+    this.peerSyncMs = options.peerSyncMs ?? 5_000;
     this.balancer = new LoadBalancer(this.config.balancer as BalancerStrategy);
     this.router = new RequestRouter(this.registry, this.toolIndex, this.balancer);
     this.healthChecker = new HealthChecker(this.registry, this.config.healthCheckInterval);
@@ -138,7 +168,7 @@ export class Gateway {
     const server = this.registry.register(entry.id, entry.name, entry.connection);
     server.status = 'connected';
     this.upstreams.set(entry.id, new UpstreamClient(entry.connection as HttpConnection));
-    if (entry.weight !== undefined) this.balancer.setWeight(entry.id, entry.weight);
+    if (entry.weight !== undefined) { this.balancer.setWeight(entry.id, entry.weight); this.weights.set(entry.id, entry.weight); }
     return server;
   }
 
@@ -149,7 +179,83 @@ export class Gateway {
     this.upstreams.delete(id);
     this.discovered.delete(id);
     this.lastSeen.delete(id);
+    this.peerSeen.delete(id);
+    this.weights.delete(id);
     this.rebuildOwners();
+  }
+
+  // ── 피어링 (gossip) ──
+
+  /** 이 인스턴스가 직접 아는 백엔드(정적·자기 등록)만 내보낸다. 피어에게 배운 것은 재전파하지 않는다 (루프 방지) */
+  peerStateSnapshot(): PeerBackendState[] {
+    return this.registry.listAll()
+      .filter((s) => s.metadata?.origin !== 'peer')
+      .map((s) => {
+        const conn = s.connection as HttpConnection;
+        const d = this.discovered.get(s.id) ?? { resources: [], prompts: [], resourceTemplates: [] };
+        return {
+          id: s.id, name: s.name, url: conn.url, ...(conn.headers ? { headers: conn.headers } : {}),
+          ...(this.weights.has(s.id) ? { weight: this.weights.get(s.id) } : {}),
+          status: s.status, tools: s.tools, resources: d.resources, prompts: d.prompts, resourceTemplates: d.resourceTemplates,
+        };
+      });
+  }
+
+  /** 피어 하나의 상태를 받아 모르는 백엔드를 흡수한다. */
+  mergePeerState(backends: PeerBackendState[]): void {
+    const now = Date.now();
+    for (const b of backends) {
+      const existing = this.registry.get(b.id);
+      if (existing && existing.metadata?.origin !== 'peer') continue; // 직접 아는 것이 우선
+      const conn = existing?.connection as HttpConnection | undefined;
+      if (!existing || conn?.url !== b.url) {
+        if (existing) this.unregister(b.id);
+        const entry = this.register({
+          id: b.id, name: b.name,
+          connection: { type: 'http', url: b.url, ...(b.headers ? { headers: b.headers } : {}) },
+          ...(b.weight !== undefined ? { weight: b.weight } : {}),
+        });
+        entry.metadata = { origin: 'peer' };
+        console.log(`[air:gateway] learned backend from peer: ${b.id} → ${b.url}`);
+      }
+      // 발견 목록은 피어 것을 그대로 (다시 discover 하지 않음)
+      const server = this.registry.get(b.id)!;
+      this.registry.updateTools(b.id, b.tools.map((t) => ({ ...t, serverId: b.id })));
+      this.toolIndex.reindex(server);
+      this.discovered.set(b.id, { resources: b.resources, prompts: b.prompts, resourceTemplates: b.resourceTemplates });
+      this.peerSeen.set(b.id, now);
+    }
+    this.rebuildOwners();
+  }
+
+  private async syncPeers(): Promise<void> {
+    await Promise.all(this.peers.map(async (base) => {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), Math.min(this.peerSyncMs, 5_000));
+      try {
+        const res = await fetch(`${base}/peers/state`, {
+          headers: this.registration.token ? { Authorization: `Bearer ${this.registration.token}` } : {},
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const body = (await res.json()) as { backends: PeerBackendState[] };
+        this.mergePeerState(body.backends ?? []);
+        if (this.peerState.get(base) !== 'up') { this.peerState.set(base, 'up'); console.log(`[air:gateway] peer ${base} up`); }
+      } catch (err: any) {
+        if (this.peerState.get(base) !== 'down') { this.peerState.set(base, 'down'); console.warn(`[air:gateway] peer ${base} unreachable (${err?.message ?? err})`); }
+      } finally {
+        clearTimeout(t);
+      }
+    }));
+    // 피어에게서 배웠는데 한동안 어느 피어에도 안 보이는 백엔드 제거
+    const now = Date.now();
+    const peerStaleMs = this.peerSyncMs * 3;
+    for (const [id, seen] of this.peerSeen) {
+      if (now - seen > peerStaleMs && this.registry.get(id)?.metadata?.origin === 'peer') {
+        console.log(`[air:gateway] peer-learned backend ${id} gone — removed`);
+        this.unregister(id);
+      }
+    }
   }
 
   // ── 자기 등록 (push registration) ──
@@ -175,7 +281,7 @@ export class Gateway {
       connection: { type: 'http', url: payload.url, ...(payload.headers ? { headers: payload.headers } : {}) },
       ...(payload.weight !== undefined ? { weight: payload.weight } : {}),
     });
-    entry.metadata = { ...(payload.metadata ?? {}), selfRegistered: true };
+    entry.metadata = { ...(payload.metadata ?? {}), selfRegistered: true, origin: 'self' };
     this.lastSeen.set(payload.id, Date.now());
     await this.discover(payload.id);
     console.log(`[air:gateway] backend registered: ${payload.id} → ${payload.url}`);
@@ -254,6 +360,11 @@ export class Gateway {
     // 자기 등록 백엔드 중 하트비트가 끊긴 것 제거
     this.sweeper = setInterval(() => this.sweepStale(), Math.max(1_000, Math.floor(this.registration.staleAfterMs / 3)));
     this.sweeper.unref();
+    if (this.peers.length > 0) {
+      void this.syncPeers();
+      this.peerTimer = setInterval(() => void this.syncPeers(), this.peerSyncMs);
+      this.peerTimer.unref();
+    }
     await new Promise<void>((resolve, reject) => {
       this.server = createServer((req, res) => {
         this.handleRequest(req, res).catch((err) => {
@@ -277,6 +388,7 @@ export class Gateway {
   async stop(): Promise<void> {
     this.healthChecker.stop();
     if (this.sweeper) { clearInterval(this.sweeper); this.sweeper = null; }
+    if (this.peerTimer) { clearInterval(this.peerTimer); this.peerTimer = null; }
     if (this.server) {
       await new Promise<void>((resolve) => this.server!.close(() => resolve()));
       this.server = null;
@@ -294,6 +406,7 @@ export class Gateway {
       name: this.config.name,
       servers: this.registry.size,
       tools: this.toolIndex.size,
+      peers: Object.fromEntries(this.peers.map((p) => [p, this.peerState.get(p) ?? 'unknown'])),
       health: this.healthChecker.getAllResults(),
     };
   }
@@ -319,6 +432,14 @@ export class Gateway {
 
     if (req.method === 'POST' && url.pathname === this.config.endpoint) {
       await this.handlePost(req, res);
+      return;
+    }
+
+    // 피어 동기화: GET /peers/state
+    if (req.method === 'GET' && url.pathname === '/peers/state') {
+      if (!this.authorizedForRegistry(req)) { res.writeHead(401, JSON_HEADERS); res.end(JSON.stringify({ error: 'Unauthorized' })); return; }
+      res.writeHead(200, JSON_HEADERS);
+      res.end(JSON.stringify({ name: this.config.name, backends: this.peerStateSnapshot() }));
       return;
     }
 

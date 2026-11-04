@@ -31,6 +31,8 @@ interface GatewayOptions {
   discoverOnStart?: boolean;      // 기본: true
   secret?: string;                // elicitation id 서명 키. 게이트웨이를 여러 대 띄우면 같은 값으로
   registration?: { token?: string; staleAfterMs?: number; enabled?: boolean };  // 백엔드 자기 등록 (/registry)
+  peers?: string[];               // 백엔드 목록을 동기화할 다른 게이트웨이들
+  peerSyncMs?: number;            // 기본: 5000
 }
 ```
 

@@ -56,6 +56,8 @@ interface GatewayOptions {
   discoverOnStart?: boolean;      // 기본: true
   secret?: string;                // elicitation id 서명 키. 게이트웨이를 여러 대 띄우면 같은 값으로
   registration?: { token?: string; staleAfterMs?: number; enabled?: boolean };  // 백엔드 자기 등록 (/registry)
+  peers?: string[];               // 백엔드 목록을 동기화할 다른 게이트웨이들
+  peerSyncMs?: number;            // 기본: 5000
 }
 ```
 
@@ -101,6 +103,19 @@ new Gateway({ port: 4000, registration: { token: process.env.GATEWAY_TOKEN, stal
 ```
 
 Gateway 엔드포인트: `POST /registry`(등록 또는 하트비트. 새로 등록되면 `201`, 하트비트면 `200`), `DELETE /registry/:id`, `GET /registry`(목록). 토큰이 설정돼 있으면 모두 `Authorization: Bearer <token>`이 필요합니다. 하트비트가 끊긴 백엔드는 `staleAfterMs` 뒤 제거되고, 같은 id가 새 URL로 다시 알리면 기존 항목을 교체합니다(포트가 바뀐 재시작). 정적 등록과 자기 등록은 공존하며 둘 다 헬스체크됩니다. 백엔드가 뜰 때 게이트웨이가 꺼져 있어도 백엔드는 정상 기동하고 조용히 재시도합니다.
+
+## 게이트웨이 여러 대 (피어링)
+
+게이트웨이를 다른 머신에 여러 대 띄우고 서로를 알려줄 수 있습니다. `peerSyncMs`마다 각 게이트웨이는 피어의 `GET /peers/state`를 읽어 모르는 백엔드를 발견 목록(도구/리소스/프롬프트)까지 그대로 흡수하므로(재발견 없음), 어느 한 게이트웨이에 등록되거나 자기 등록한 백엔드를 전부가 서비스합니다. 직접 아는 백엔드만 공유하고 재전파하지 않으니 모든 게이트웨이에 모든 피어를 나열하세요(full mesh). 피어에게 배운 백엔드는 한동안 어느 피어에도 안 보이면 제거되고, 다른 백엔드처럼 헬스체크됩니다.
+
+```typescript
+// gw1
+new Gateway({ port: 4000, host: '0.0.0.0', secret: SECRET, registration: { token: TOKEN }, peers: ['http://gw2:4000'] });
+// gw2
+new Gateway({ port: 4000, host: '0.0.0.0', secret: SECRET, registration: { token: TOKEN }, peers: ['http://gw1:4000'] });
+```
+
+elicitation 응답이 어느 게이트웨이로 가도 백엔드까지 닿도록 모든 피어에 같은 `secret`을, 그리고 `/peers/state` 인증에도 쓰이는 같은 `registration.token`을 주세요. 외부 저장소로 공유하는 것은 없습니다 — 각 게이트웨이가 자기 메모리 뷰와 헬스 결과를 따로 가집니다. 클라이언트는 여전히 주소 하나로 접속하므로, 게이트웨이 간 클라이언트 측 페일오버는 `air bridge`를 참고하세요.
 
 ## Gateway가 직접 답하는 것 / 전달하는 것
 

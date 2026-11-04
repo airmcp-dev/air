@@ -30,6 +30,8 @@ interface GatewayOptions {
   discoverOnStart?: boolean;      // default: true
   secret?: string;                // HMAC key for elicitation ids; share it across gateway instances
   registration?: { token?: string; staleAfterMs?: number; enabled?: boolean };  // backend self-registration (/registry)
+  peers?: string[];               // other gateway instances to sync backends with
+  peerSyncMs?: number;            // default: 5000
 }
 ```
 

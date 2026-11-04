@@ -1,6 +1,6 @@
 // @airmcp-dev/gateway — gateway/index.ts
 export { Gateway } from './gateway.js';
-export type { GatewayOptions, GatewayServerRegistration, RegistrationPayload } from './gateway.js';
+export type { GatewayOptions, GatewayServerRegistration, RegistrationPayload, PeerBackendState } from './gateway.js';
 export { UpstreamClient } from './upstream.js';
 export { GatewayRequestIds } from './request-id.js';
 export type { DecodedGatewayId } from './request-id.js';

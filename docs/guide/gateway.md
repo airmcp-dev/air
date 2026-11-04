@@ -56,6 +56,8 @@ interface GatewayOptions {
   discoverOnStart?: boolean;      // default: true
   secret?: string;                // HMAC key for elicitation ids; share it across gateway instances
   registration?: { token?: string; staleAfterMs?: number; enabled?: boolean };  // backend self-registration (/registry)
+  peers?: string[];               // other gateway instances to sync backends with
+  peerSyncMs?: number;            // default: 5000
 }
 ```
 
@@ -101,6 +103,19 @@ new Gateway({ port: 4000, registration: { token: process.env.GATEWAY_TOKEN, stal
 ```
 
 Gateway endpoints: `POST /registry` (register or heartbeat; `201` when new, `200` on heartbeat), `DELETE /registry/:id`, `GET /registry` (list). All require `Authorization: Bearer <token>` when a token is configured. A backend whose heartbeat stops is removed after `staleAfterMs`; a backend that re-announces the same id with a new URL replaces the old entry (restarts with a new port). Statically registered and self-registered backends coexist; both are health-checked. If the gateway is down when a backend starts, the backend still starts and keeps retrying quietly.
+
+## Running several gateways (peering)
+
+Gateways can be started on different machines and told about each other. Every `peerSyncMs` each gateway reads `GET /peers/state` from its peers and adopts backends it does not know yet, including their discovered tool/resource/prompt lists (no re-discovery), so a backend registered with — or announcing itself to — one gateway is served by all of them. Only directly known backends are shared (never re-propagated), so list every peer on every gateway (full mesh). Peer-learned backends are dropped when no peer lists them for a while, and health-checked like any other.
+
+```typescript
+// gw1
+new Gateway({ port: 4000, host: '0.0.0.0', secret: SECRET, registration: { token: TOKEN }, peers: ['http://gw2:4000'] });
+// gw2
+new Gateway({ port: 4000, host: '0.0.0.0', secret: SECRET, registration: { token: TOKEN }, peers: ['http://gw1:4000'] });
+```
+
+Use the same `secret` on every peer so an elicitation reply sent to any gateway reaches the backend, and the same `registration.token`, which also authenticates `/peers/state`. Nothing is shared through an external store: each gateway keeps its own in-memory view and health results. Clients still need a single address to connect to; see `air bridge` for client-side failover across gateways.
 
 ## What Gateway answers itself vs. forwards
 
