@@ -120,6 +120,8 @@ docker run -d -p 3510:3510 \
   --name mcp my-mcp-server
 ```
 
+The HTTP and SSE transports listen on `127.0.0.1` by default. In a container, set `transport: { type: 'http', port: 3510, host: '0.0.0.0' }` so the published port is reachable.
+
 ### systemd
 
 ```ini

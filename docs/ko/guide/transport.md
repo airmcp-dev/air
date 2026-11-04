@@ -82,6 +82,10 @@ defineServer({
 [air] SSE client disconnected (session: a1b2c3d4-...)
 ```
 
+### Origin 검사
+
+Streamable HTTP와 같이 기본으로 `127.0.0.1`에만 바인딩하고, `Origin` 헤더가 localhost 출처도 아니고 `transport.allowedOrigins`에도 없는 요청에는 모든 경로에서 `403`을 돌려줍니다 (MCP 스펙의 DNS rebinding 방지). `Origin` 헤더가 없는 요청(브라우저가 아닌 클라이언트)은 받습니다.
+
 ### CORS
 
 SSE 트랜스포트는 CORS 헤더를 자동으로 설정합니다:
@@ -104,8 +108,21 @@ defineServer({
 | 메서드 | 설명 |
 |--------|------|
 | `POST` | MCP 메시지 처리 |
-| `GET` | 서버 상태 JSON 반환 |
+| `GET` | `/`: 서버 상태 JSON 반환. `/mcp`: `405` (서버 발신 SSE 스트림 없음) |
 | `DELETE` | 세션 종료 |
+
+기본으로 `127.0.0.1`에만 바인딩하고, `Origin` 헤더가 localhost 출처가 아닌 요청에는 `403`을 돌려줍니다 (MCP 스펙의 DNS rebinding 방지). 컨테이너나 원격 클라이언트에서 접속하려면 `host`를, 다른 출처의 브라우저 클라이언트를 받으려면 `allowedOrigins`를 지정합니다:
+
+```typescript
+defineServer({
+  transport: {
+    type: 'http',
+    port: 3510,
+    host: '0.0.0.0',
+    allowedOrigins: ['https://app.example.com'],
+  },
+});
+```
 
 각 세션에 고유 ID(`crypto.randomUUID()`)가 자동 할당됩니다.
 
@@ -198,7 +215,8 @@ node dist/index.js
 interface TransportConfig {
   type?: 'stdio' | 'sse' | 'http' | 'workers' | 'auto';  // 기본: 'auto'
   port?: number;                               // HTTP/SSE 포트
-  host?: string;                               // 기본: 'localhost'
+  host?: string;                               // 기본: '127.0.0.1' (외부 접속을 받으려면 '0.0.0.0')
+  allowedOrigins?: string[];                   // localhost 외에 허용할 브라우저 Origin (http, sse)
   basePath?: string;                           // 기본: '/'
 }
 ```

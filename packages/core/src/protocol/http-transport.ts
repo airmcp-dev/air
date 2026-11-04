@@ -13,24 +13,32 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { McpProtocolEngine, JsonRpcRequest } from './mcp-protocol.js';
-import { PROTOCOL_VERSIONS } from './mcp-protocol.js';
+import { PROTOCOL_VERSIONS, SUPPORTED_VERSIONS, ErrorCodes } from './mcp-protocol.js';
+import { checkOrigin } from './origin.js';
 
 export interface AirHttpTransportOptions {
   /** MCP 엔드포인트 경로 (기본: '/mcp') */
   endpoint?: string;
   /** CORS origin (기본: '*') */
   corsOrigin?: string;
+  /**
+   * 루프백 출처(localhost, 127.0.0.1, [::1]) 외에 더 허용할 브라우저 Origin 목록.
+   * 예: ['https://app.example.com']. '*'는 모든 Origin 허용.
+   */
+  allowedOrigins?: string[];
 }
 
 export class AirHttpTransport {
   private engine: McpProtocolEngine;
   private endpoint: string;
   private corsOrigin: string;
+  private allowedOrigins?: string[];
 
   constructor(engine: McpProtocolEngine, options?: AirHttpTransportOptions) {
     this.engine = engine;
     this.endpoint = options?.endpoint ?? '/mcp';
     this.corsOrigin = options?.corsOrigin ?? '*';
+    this.allowedOrigins = options?.allowedOrigins;
   }
 
   /**
@@ -39,6 +47,9 @@ export class AirHttpTransport {
    */
   async handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+
+    // Origin이 허용되지 않으면 403 (MCP 스펙 Streamable HTTP, Security Warning)
+    if (!checkOrigin(req, res, this.allowedOrigins)) return;
 
     // CORS
     res.setHeader('Access-Control-Allow-Origin', this.corsOrigin);
@@ -57,18 +68,11 @@ export class AirHttpTransport {
       return;
     }
 
-    // GET /mcp — server/discover 단축
+    // GET /mcp — 서버 발신 SSE 스트림을 제공하지 않으므로 405 (MCP 스펙 Streamable HTTP).
+    // 서버 정보는 POST server/discover 또는 GET /로 얻는다.
     if (req.method === 'GET' && url.pathname === this.endpoint) {
-      const discoverResponse = await this.engine.handleMessage({
-        jsonrpc: '2.0',
-        method: 'server/discover',
-        id: 'discover-' + Date.now(),
-      });
-      res.writeHead(200, {
-        'Content-Type': 'application/json',
-        'MCP-Protocol-Version': PROTOCOL_VERSIONS.MODERN,
-      });
-      res.end(JSON.stringify(discoverResponse));
+      res.writeHead(405, { 'Content-Type': 'application/json', Allow: 'POST, OPTIONS' });
+      res.end(JSON.stringify({ error: 'GET not supported: this endpoint does not offer an SSE stream' }));
       return;
     }
 
@@ -125,10 +129,23 @@ export class AirHttpTransport {
     const mcpVersion = req.headers['mcp-protocol-version'] as string | undefined;
     const mcpMethod = req.headers['mcp-method'] as string | undefined;
 
-    // 프로토콜 버전 응답 헤더 설정
-    const responseVersion = mcpVersion === PROTOCOL_VERSIONS.MODERN
-      ? PROTOCOL_VERSIONS.MODERN
-      : PROTOCOL_VERSIONS.LEGACY;
+    // 지원하지 않는 MCP-Protocol-Version은 400 (MCP 스펙 Streamable HTTP, Protocol Version Header)
+    if (mcpVersion !== undefined && !(SUPPORTED_VERSIONS as string[]).includes(mcpVersion)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        jsonrpc: '2.0',
+        id: Array.isArray(body) ? null : body?.id ?? null,
+        error: {
+          code: ErrorCodes.UNSUPPORTED_PROTOCOL_VERSION,
+          message: `Unsupported protocol version: ${mcpVersion}`,
+          data: { supported: SUPPORTED_VERSIONS, requested: mcpVersion },
+        },
+      }));
+      return;
+    }
+
+    // 프로토콜 버전 응답 헤더 설정 — 요청 헤더의 버전, 없으면 레거시
+    const responseVersion = mcpVersion ?? PROTOCOL_VERSIONS.LEGACY;
 
     // 배치 요청 처리
     if (Array.isArray(body)) {

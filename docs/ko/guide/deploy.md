@@ -129,6 +129,8 @@ docker run -d -p 3510:3510 \
   --name mcp my-mcp-server
 ```
 
+HTTP, SSE transport는 기본으로 `127.0.0.1`에만 바인딩합니다. 컨테이너에서는 `transport: { type: 'http', port: 3510, host: '0.0.0.0' }`처럼 `host`를 지정해야 publish한 포트로 접속됩니다.
+
 ### systemd
 
 ```ini

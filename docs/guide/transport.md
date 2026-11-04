@@ -82,6 +82,10 @@ Terminal output:
 [air] SSE client disconnected (session: a1b2c3d4-...)
 ```
 
+### Origin check
+
+Like Streamable HTTP, the SSE server listens on `127.0.0.1` by default and answers `403` on every path to a request whose `Origin` header is neither a localhost origin nor listed in `transport.allowedOrigins` (MCP spec, DNS rebinding protection). Requests without an `Origin` header (non-browser clients) are accepted.
+
 ### CORS
 
 SSE transport sets CORS headers automatically:
@@ -104,8 +108,21 @@ defineServer({
 | Method | Description |
 |--------|-------------|
 | `POST` | MCP message handling |
-| `GET` | Server status JSON |
+| `GET` | `/`: server status JSON. `/mcp`: `405` (no server-initiated SSE stream) |
 | `DELETE` | Session termination |
+
+By default the server listens on `127.0.0.1` only and answers `403` to a request whose `Origin` header is not a localhost origin (MCP spec, DNS rebinding protection). For a container or remote clients, set `host`; for browser clients on another origin, list them in `allowedOrigins`:
+
+```typescript
+defineServer({
+  transport: {
+    type: 'http',
+    port: 3510,
+    host: '0.0.0.0',
+    allowedOrigins: ['https://app.example.com'],
+  },
+});
+```
 
 Each session gets a unique ID via `crypto.randomUUID()`.
 
@@ -198,7 +215,8 @@ node dist/index.js
 interface TransportConfig {
   type?: 'stdio' | 'sse' | 'http' | 'workers' | 'auto';  // Default: 'auto'
   port?: number;                               // HTTP/SSE port
-  host?: string;                               // Default: 'localhost'
+  host?: string;                               // Default: '127.0.0.1' ('0.0.0.0' to accept remote clients)
+  allowedOrigins?: string[];                   // Browser Origins allowed besides localhost (http, sse)
   basePath?: string;                           // Default: '/'
 }
 ```
