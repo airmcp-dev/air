@@ -50,6 +50,10 @@ const server = defineServer({
         content: [
           { type: 'text', text: 'Here is some text' },
           { type: 'image', data: TINY_PNG_B64, mimeType: 'image/png' },
+          {
+            type: 'resource',
+            resource: { uri: 'test://mixed', mimeType: 'text/plain', text: 'Mixed resource content' },
+          },
         ],
       }),
     }),
@@ -152,11 +156,11 @@ const server = defineServer({
     definePrompt('test_prompt_with_arguments', {
       description: 'A prompt with arguments',
       arguments: [
-        { name: 'name', description: 'Name to greet', required: true },
-        { name: 'style', description: 'Greeting style', required: false },
+        { name: 'arg1', description: 'First argument', required: true },
+        { name: 'arg2', description: 'Second argument', required: true },
       ],
-      handler: ({ name, style }) => [
-        { role: 'user', content: `Hello, ${name}!${style ? ` Style: ${style}` : ''}` },
+      handler: ({ arg1, arg2 }) => [
+        { role: 'user', content: `Prompt with arguments: arg1='${arg1}', arg2='${arg2}'` },
       ],
     }),
     definePrompt('test_prompt_with_embedded_resource', {
