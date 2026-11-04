@@ -7,3 +7,6 @@ dist/
 
 # Enterprise packages (commercial, not open source)
 packages/hive/
+
+# MCP conformance suite output
+conformance-results/
