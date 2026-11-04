@@ -8,7 +8,7 @@
     "test": "npx tsx src/test.ts"
   },
   "dependencies": {
-    "@airmcp-dev/core": "^0.1.0",
+    "@airmcp-dev/core": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0"
   }
 }

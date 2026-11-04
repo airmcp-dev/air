@@ -9,10 +9,10 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@airmcp-dev/core": "^0.1.0",
-    "@airmcp-dev/logger": "^0.1.0",
-    "@airmcp-dev/shield": "^0.1.0",
-    "@airmcp-dev/meter": "^0.1.0",
+    "@airmcp-dev/core": "workspace:*",
+    "@airmcp-dev/logger": "workspace:*",
+    "@airmcp-dev/shield": "workspace:*",
+    "@airmcp-dev/meter": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "devDependencies": {
