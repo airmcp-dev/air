@@ -461,6 +461,17 @@ export class McpProtocolEngine {
     const prompt = this.config.prompts.find(p => p.name === name);
     if (!prompt) throw Object.assign(new Error(`Prompt not found: ${name}`), { code: ErrorCodes.INVALID_PARAMS });
 
+    // 필수 인자 확인 — 빠지면 -32602 (MCP 스펙 server/prompts, Error Handling)
+    const missing = (prompt.arguments ?? [])
+      .filter(a => a.required && (args[a.name] === undefined || args[a.name] === null))
+      .map(a => a.name);
+    if (missing.length > 0) {
+      throw Object.assign(
+        new Error(`Missing required arguments for prompt ${name}: ${missing.join(', ')}`),
+        { code: ErrorCodes.INVALID_PARAMS },
+      );
+    }
+
     const messages = await prompt.handler(args);
 
     return {
