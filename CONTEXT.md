@@ -25,6 +25,7 @@ const server = defineServer({
   version: '1.0.0',               // Default: '0.1.0'
   description: 'Server description',
   transport: { type: 'sse', port: 3510 },  // 'stdio' | 'sse' | 'http' | 'workers' | 'auto'
+  gateway: { url: 'http://gw:4000', token: '…', heartbeatMs: 5000 },  // optional: self-register with @airmcp-dev/gateway (http transport)
   storage: { type: 'file', path: '.air/data' },  // 'memory' | 'file'
   logging: { level: 'info', format: 'json' },
   meter: { classify: true, trackCalls: true },

@@ -58,6 +58,25 @@ export interface MeterConfig {
   };
 }
 
+/** 게이트웨이 자기 등록 설정 */
+export interface GatewayRegistrationConfig {
+  /** 게이트웨이 주소. 하나 또는 여러 개 (피어 전부에 등록) */
+  url: string | string[];
+  /** 게이트웨이 registration.token과 같은 값 */
+  token?: string;
+  /** 하트비트 간격 ms (기본: 5000). 게이트웨이의 staleAfterMs보다 짧아야 한다 */
+  heartbeatMs?: number;
+  /**
+   * 게이트웨이가 이 서버를 부를 주소. 기본은 `http://<host>:<port>/mcp`이며,
+   * host가 0.0.0.0이면 os.hostname()을 쓴다. 컨테이너/NAT에서는 직접 지정한다.
+   */
+  advertiseUrl?: string;
+  /** 레지스트리 id (기본: 서버 name) */
+  id?: string;
+  /** weighted 밸런서용 가중치 */
+  weight?: number;
+}
+
 export interface AirConfig {
   /** 서버 이름 (MCP 등록명) */
   name: string;
@@ -68,6 +87,13 @@ export interface AirConfig {
 
   /** Transport 설정 (기본: auto-detect) */
   transport?: TransportConfig;
+
+  /**
+   * 게이트웨이 자기 등록 (http transport 전용).
+   * 서버가 뜨면 게이트웨이의 POST /registry에 자신을 알리고 heartbeatMs마다 하트비트를 보낸다.
+   * 게이트웨이가 꺼져 있어도 서버는 정상 기동하며 등록을 계속 재시도한다.
+   */
+  gateway?: GatewayRegistrationConfig;
 
   /** SSE 최대 동시 세션 수 (기본: 200, 초과 시 503) */
   maxSseSessions?: number;

@@ -29,6 +29,7 @@ interface GatewayOptions {
   requestTimeout?: number;        // ms per upstream call, default: 30000
   discoverOnStart?: boolean;      // default: true
   secret?: string;                // HMAC key for elicitation ids; share it across gateway instances
+  registration?: { token?: string; staleAfterMs?: number; enabled?: boolean };  // backend self-registration (/registry)
 }
 ```
 

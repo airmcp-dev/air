@@ -55,6 +55,7 @@ interface GatewayOptions {
   requestTimeout?: number;        // ms per upstream call, default: 30000
   discoverOnStart?: boolean;      // default: true
   secret?: string;                // HMAC key for elicitation ids; share it across gateway instances
+  registration?: { token?: string; staleAfterMs?: number; enabled?: boolean };  // backend self-registration (/registry)
 }
 ```
 
@@ -74,6 +75,32 @@ await gateway.discover('files');  // one backend
 ```
 
 `register()` throws for `stdio` and `sse` connections.
+
+## Self-registration (push)
+
+Instead of listing backends in the Gateway, let backends announce themselves. An air server with a `gateway` section registers on start, sends a heartbeat every `heartbeatMs`, and deregisters on `stop()`:
+
+```typescript
+// backend
+defineServer({
+  name: 'search',
+  transport: { type: 'http', port: 3510, host: '0.0.0.0' },
+  gateway: {
+    url: 'http://gw.internal:4000',   // or an array — registers with every gateway listed
+    token: process.env.GATEWAY_TOKEN,
+    heartbeatMs: 5_000,               // must be shorter than the gateway's staleAfterMs
+    advertiseUrl: 'http://10.0.0.5:3510/mcp', // optional; default http://<host>:<port>/mcp (hostname when host is 0.0.0.0)
+    id: 'search-1',                   // optional; default: name
+    weight: 2,                        // optional, for the weighted balancer
+  },
+  tools: [...],
+});
+
+// gateway
+new Gateway({ port: 4000, registration: { token: process.env.GATEWAY_TOKEN, staleAfterMs: 30_000 } });
+```
+
+Gateway endpoints: `POST /registry` (register or heartbeat; `201` when new, `200` on heartbeat), `DELETE /registry/:id`, `GET /registry` (list). All require `Authorization: Bearer <token>` when a token is configured. A backend whose heartbeat stops is removed after `staleAfterMs`; a backend that re-announces the same id with a new URL replaces the old entry (restarts with a new port). Statically registered and self-registered backends coexist; both are health-checked. If the gateway is down when a backend starts, the backend still starts and keeps retrying quietly.
 
 ## What Gateway answers itself vs. forwards
 

@@ -19,6 +19,7 @@ import { AirHttpTransport } from '../protocol/http-transport.js';
 import { checkOrigin } from '../protocol/origin.js';
 import { PendingRequests, isJsonRpcResponse, type AirOutbound } from '../protocol/outbound.js';
 import { onShutdown } from './lifecycle.js';
+import { GatewayRegistration } from './gateway-registration.js';
 
 export class ServerRunner {
   private engine: McpProtocolEngine;
@@ -33,6 +34,8 @@ export class ServerRunner {
   private httpServer: import('node:http').Server | null = null;
   /** sse transport의 세션 매니저 — stop()에서 전부 닫는다 */
   private sseSessions: AirSSESessionManager | null = null;
+  /** 게이트웨이 자기 등록 (config.gateway) */
+  private gatewayRegistration: GatewayRegistration | null = null;
 
   constructor(config: AirConfig, middlewareChain: MiddlewareChain) {
     this.config = config;
@@ -136,6 +139,12 @@ export class ServerRunner {
 
     server.listen(port, host, () => {
       console.log(`[air] HTTP server listening on port ${port} (${host})`);
+      // 게이트웨이 자기 등록 — 리슨 후에 시작해야 게이트웨이의 discover가 바로 성공한다
+      if (this.config.gateway) {
+        const advertiseUrl = GatewayRegistration.advertiseUrl(this.config.gateway, host, port);
+        this.gatewayRegistration = new GatewayRegistration(this.config.gateway, { advertiseUrl, name: this.config.name });
+        this.gatewayRegistration.start();
+      }
     });
 
     onShutdown(async () => {
@@ -329,6 +338,10 @@ export class ServerRunner {
   async stop() {
     this.serverCtx.status = 'stopping';
     this.stdioTransport?.stop();
+    if (this.gatewayRegistration) {
+      await this.gatewayRegistration.stop();
+      this.gatewayRegistration = null;
+    }
     if (this.sseSessions) {
       await this.sseSessions.closeAll();
       this.sseSessions = null;

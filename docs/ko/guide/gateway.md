@@ -55,6 +55,7 @@ interface GatewayOptions {
   requestTimeout?: number;        // upstream 호출당 ms, 기본: 30000
   discoverOnStart?: boolean;      // 기본: true
   secret?: string;                // elicitation id 서명 키. 게이트웨이를 여러 대 띄우면 같은 값으로
+  registration?: { token?: string; staleAfterMs?: number; enabled?: boolean };  // 백엔드 자기 등록 (/registry)
 }
 ```
 
@@ -74,6 +75,32 @@ await gateway.discover('files');  // 하나만
 ```
 
 `stdio`·`sse` 연결은 `register()`에서 예외를 던집니다.
+
+## 자기 등록 (push)
+
+Gateway에 백엔드를 나열하는 대신 백엔드가 스스로 알리게 할 수 있습니다. `gateway` 설정이 있는 air 서버는 기동 시 등록하고, `heartbeatMs`마다 하트비트를 보내고, `stop()` 때 해제합니다:
+
+```typescript
+// 백엔드
+defineServer({
+  name: 'search',
+  transport: { type: 'http', port: 3510, host: '0.0.0.0' },
+  gateway: {
+    url: 'http://gw.internal:4000',   // 배열이면 나열된 게이트웨이 전부에 등록
+    token: process.env.GATEWAY_TOKEN,
+    heartbeatMs: 5_000,               // 게이트웨이의 staleAfterMs보다 짧아야 함
+    advertiseUrl: 'http://10.0.0.5:3510/mcp', // 선택. 기본 http://<host>:<port>/mcp (host가 0.0.0.0이면 hostname)
+    id: 'search-1',                   // 선택. 기본: name
+    weight: 2,                        // 선택, weighted 밸런서용
+  },
+  tools: [...],
+});
+
+// 게이트웨이
+new Gateway({ port: 4000, registration: { token: process.env.GATEWAY_TOKEN, staleAfterMs: 30_000 } });
+```
+
+Gateway 엔드포인트: `POST /registry`(등록 또는 하트비트. 새로 등록되면 `201`, 하트비트면 `200`), `DELETE /registry/:id`, `GET /registry`(목록). 토큰이 설정돼 있으면 모두 `Authorization: Bearer <token>`이 필요합니다. 하트비트가 끊긴 백엔드는 `staleAfterMs` 뒤 제거되고, 같은 id가 새 URL로 다시 알리면 기존 항목을 교체합니다(포트가 바뀐 재시작). 정적 등록과 자기 등록은 공존하며 둘 다 헬스체크됩니다. 백엔드가 뜰 때 게이트웨이가 꺼져 있어도 백엔드는 정상 기동하고 조용히 재시도합니다.
 
 ## Gateway가 직접 답하는 것 / 전달하는 것
 

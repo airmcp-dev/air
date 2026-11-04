@@ -77,6 +77,7 @@ export type { TelemetryConfig, TelemetryEvent } from './telemetry/index.js';
 // ── 타입 ──
 export type {
   AirConfig,
+  GatewayRegistrationConfig,
   ShieldConfig,
   MeterConfig,
   TransportType,

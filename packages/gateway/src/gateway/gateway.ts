@@ -48,6 +48,29 @@ export interface GatewayOptions extends GatewayConfig {
    * 없으면 프로세스마다 임의 키 (단일 인스턴스용).
    */
   secret?: string;
+  /**
+   * 백엔드 자기 등록(push registration). 백엔드가 `POST /registry`로 자신을 알리고 주기적으로 하트비트를 보낸다.
+   * air 서버는 `gateway: { url, token }` 설정으로 자동 등록한다.
+   */
+  registration?: {
+    /** 요청의 Authorization: Bearer <token>과 비교. 없으면 인증 없음 (루프백/내부망 전제) */
+    token?: string;
+    /** 이 시간(ms) 동안 하트비트가 없으면 제거 (기본: 30초) */
+    staleAfterMs?: number;
+    /** false면 /registry를 열지 않는다 (기본: true) */
+    enabled?: boolean;
+  };
+}
+
+/** POST /registry 본문 */
+export interface RegistrationPayload {
+  id: string;
+  name: string;
+  /** 백엔드의 Streamable HTTP 엔드포인트 (예: http://10.0.0.5:3510/mcp) */
+  url: string;
+  weight?: number;
+  headers?: Record<string, string>;
+  metadata?: Record<string, any>;
 }
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
@@ -70,6 +93,10 @@ export class Gateway {
   private discovered = new Map<string, { resources: any[]; prompts: any[]; resourceTemplates: any[] }>();
   /** 서버발 요청 id ↔ 게이트웨이 id (stateless, HMAC) */
   private readonly ids: GatewayRequestIds;
+  /** 자기 등록한 백엔드의 마지막 하트비트 시각 */
+  private lastSeen = new Map<string, number>();
+  private sweeper: ReturnType<typeof setInterval> | null = null;
+  private readonly registration: { enabled: boolean; token?: string; staleAfterMs: number };
   private server: Server | null = null;
   /** initialize에서 받은 클라이언트 능력 — 하위 서버에 _meta로 전달 */
   private clientCapabilities: Record<string, any> = {};
@@ -88,6 +115,11 @@ export class Gateway {
       discoverOnStart: options.discoverOnStart ?? true,
     };
     this.ids = new GatewayRequestIds(options.secret);
+    this.registration = {
+      enabled: options.registration?.enabled ?? true,
+      token: options.registration?.token,
+      staleAfterMs: options.registration?.staleAfterMs ?? 30_000,
+    };
     this.balancer = new LoadBalancer(this.config.balancer as BalancerStrategy);
     this.router = new RequestRouter(this.registry, this.toolIndex, this.balancer);
     this.healthChecker = new HealthChecker(this.registry, this.config.healthCheckInterval);
@@ -116,7 +148,55 @@ export class Gateway {
     this.registry.unregister(id);
     this.upstreams.delete(id);
     this.discovered.delete(id);
+    this.lastSeen.delete(id);
     this.rebuildOwners();
+  }
+
+  // ── 자기 등록 (push registration) ──
+
+  /**
+   * 백엔드의 등록/하트비트를 처리한다. 처음 보는 id면 등록하고 목록을 발견한다.
+   * 같은 id가 다른 url로 오면 교체한다 (재시작으로 포트가 바뀐 경우).
+   */
+  async acceptRegistration(payload: RegistrationPayload): Promise<{ registered: boolean }> {
+    const existing = this.registry.get(payload.id);
+    const conn = (existing?.connection as HttpConnection | undefined);
+    const changed = !existing || conn?.url !== payload.url;
+    this.lastSeen.set(payload.id, Date.now());
+    if (!changed) {
+      // 하트비트: 상태만 회복
+      if (existing!.status !== 'connected') this.registry.updateStatus(payload.id, 'connected');
+      return { registered: false };
+    }
+    if (existing) this.unregister(payload.id);
+    const entry = this.register({
+      id: payload.id,
+      name: payload.name,
+      connection: { type: 'http', url: payload.url, ...(payload.headers ? { headers: payload.headers } : {}) },
+      ...(payload.weight !== undefined ? { weight: payload.weight } : {}),
+    });
+    entry.metadata = { ...(payload.metadata ?? {}), selfRegistered: true };
+    this.lastSeen.set(payload.id, Date.now());
+    await this.discover(payload.id);
+    console.log(`[air:gateway] backend registered: ${payload.id} → ${payload.url}`);
+    return { registered: true };
+  }
+
+  /** 하트비트가 끊긴 자기 등록 백엔드를 제거한다. */
+  private sweepStale(): void {
+    const now = Date.now();
+    for (const [id, seen] of this.lastSeen) {
+      if (now - seen > this.registration.staleAfterMs) {
+        console.log(`[air:gateway] backend ${id} stale (no heartbeat for ${now - seen}ms) — removed`);
+        this.unregister(id);
+      }
+    }
+  }
+
+  private authorizedForRegistry(req: IncomingMessage): boolean {
+    if (!this.registration.token) return true;
+    const auth = String(req.headers.authorization ?? '');
+    return auth === `Bearer ${this.registration.token}`;
   }
 
   /** 하위 서버의 tools/resources/prompts를 (다시) 발견한다. id를 주면 그 서버만. */
@@ -171,6 +251,9 @@ export class Gateway {
   async start(): Promise<void> {
     if (this.config.discoverOnStart) await this.discover();
     this.healthChecker.start();
+    // 자기 등록 백엔드 중 하트비트가 끊긴 것 제거
+    this.sweeper = setInterval(() => this.sweepStale(), Math.max(1_000, Math.floor(this.registration.staleAfterMs / 3)));
+    this.sweeper.unref();
     await new Promise<void>((resolve, reject) => {
       this.server = createServer((req, res) => {
         this.handleRequest(req, res).catch((err) => {
@@ -193,6 +276,7 @@ export class Gateway {
 
   async stop(): Promise<void> {
     this.healthChecker.stop();
+    if (this.sweeper) { clearInterval(this.sweeper); this.sweeper = null; }
     if (this.server) {
       await new Promise<void>((resolve) => this.server!.close(() => resolve()));
       this.server = null;
@@ -235,6 +319,56 @@ export class Gateway {
 
     if (req.method === 'POST' && url.pathname === this.config.endpoint) {
       await this.handlePost(req, res);
+      return;
+    }
+
+    // 백엔드 자기 등록: POST /registry (등록·하트비트), DELETE /registry/:id, GET /registry
+    if (this.registration.enabled && (url.pathname === '/registry' || url.pathname.startsWith('/registry/'))) {
+      if (!this.authorizedForRegistry(req)) {
+        res.writeHead(401, JSON_HEADERS);
+        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        return;
+      }
+      if (req.method === 'GET' && url.pathname === '/registry') {
+        res.writeHead(200, JSON_HEADERS);
+        res.end(JSON.stringify({
+          servers: this.registry.listAll().map((s) => ({
+            id: s.id, name: s.name, status: s.status,
+            url: (s.connection as HttpConnection).url,
+            tools: s.tools.map((t) => t.name),
+            selfRegistered: s.metadata?.selfRegistered === true,
+            lastSeen: this.lastSeen.get(s.id) ?? null,
+          })),
+        }));
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/registry') {
+        let payload: RegistrationPayload;
+        try {
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+          payload = JSON.parse(Buffer.concat(chunks).toString('utf-8'));
+          if (!payload?.id || !payload?.url || !payload?.name) throw new Error('id, name, url are required');
+          new URL(payload.url);
+        } catch (err: any) {
+          res.writeHead(400, JSON_HEADERS);
+          res.end(JSON.stringify({ error: `Invalid registration: ${err?.message ?? err}` }));
+          return;
+        }
+        const result = await this.acceptRegistration(payload);
+        res.writeHead(result.registered ? 201 : 200, JSON_HEADERS);
+        res.end(JSON.stringify({ ok: true, ...result, staleAfterMs: this.registration.staleAfterMs }));
+        return;
+      }
+      if (req.method === 'DELETE' && url.pathname.startsWith('/registry/')) {
+        const id = decodeURIComponent(url.pathname.slice('/registry/'.length));
+        const existed = !!this.registry.get(id);
+        if (existed) this.unregister(id);
+        res.writeHead(existed ? 200 : 404, JSON_HEADERS);
+        res.end(JSON.stringify({ ok: existed }));
+        return;
+      }
+      res.writeHead(405, { ...JSON_HEADERS, Allow: 'GET, POST, DELETE' }).end();
       return;
     }
 

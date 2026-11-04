@@ -112,6 +112,13 @@ export function defineServer(options: AirServerOptions): AirServer {
     shield: options.shield,
     meter: options.meter,
     dev: options.dev,
+    // 러너가 읽는 운영 옵션 — 빠뜨리면 조용히 무시되므로 여기서 명시적으로 넘긴다
+    gateway: options.gateway,
+    maxSseSessions: options.maxSseSessions,
+    sseIdleTimeoutMs: options.sseIdleTimeoutMs,
+    sseHeartbeatMs: options.sseHeartbeatMs,
+    sseReplayBufferSize: options.sseReplayBufferSize,
+    sseReplayTtlMs: options.sseReplayTtlMs,
   };
 
   const runner = new ServerRunner(config, chain);

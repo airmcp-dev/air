@@ -1,6 +1,6 @@
 // @airmcp-dev/core — types/index.ts (re-export only)
 
-export type { AirConfig, ShieldConfig, MeterConfig } from './config.js';
+export type { AirConfig, ShieldConfig, MeterConfig, GatewayRegistrationConfig } from './config.js';
 export type { TransportType, TransportConfig } from './transport.js';
 export type {
   ParamShorthand,
