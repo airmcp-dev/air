@@ -9,11 +9,14 @@ cd "$(dirname "$0")/.."
 PORT=19789
 OUT_DIR="${CONFORMANCE_OUT:-conformance-results}"
 
-TSX_DISABLE_CACHE=1 npx -y tsx __tests__/conformance-server.ts > /tmp/air-conformance-server.log 2>&1 &
+# pnpm이 PATH에 없으면 corepack 경유
+if command -v pnpm >/dev/null 2>&1; then PNPM=pnpm; else PNPM="corepack pnpm"; fi
+
+TSX_DISABLE_CACHE=1 $PNPM --package=tsx dlx tsx __tests__/conformance-server.ts > /tmp/air-conformance-server.log 2>&1 &
 SERVER_PID=$!
 trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
 
-for _ in $(seq 1 30); do
+for _ in $(seq 1 60); do
   if curl -sf "http://127.0.0.1:${PORT}/health" > /dev/null 2>&1; then break; fi
   sleep 0.5
 done
@@ -25,7 +28,7 @@ fi
 rm -rf "$OUT_DIR"
 
 # 스위트 자체의 exit code는 무시하고(WARNING-only 시나리오 판정이 일관적이지 않음) 결과 JSON을 직접 판정한다
-npx -y @modelcontextprotocol/conformance server \
+$PNPM --package=@modelcontextprotocol/conformance dlx conformance server \
   --url "http://localhost:${PORT}/mcp" \
   -o "$OUT_DIR" || true
 
