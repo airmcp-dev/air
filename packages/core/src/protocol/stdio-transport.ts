@@ -3,12 +3,11 @@
 // air 자체 stdio transport.
 // MCP SDK의 StdioServerTransport를 대체.
 // stdin에서 JSON-RPC 메시지를 읽고, stdout으로 응답을 쓴다.
-// Content-Length 헤더 기반 메시지 프레이밍 (LSP 스타일).
+// 줄 단위 JSON 프레이밍 (MCP 스펙 basic/transports, stdio):
+//   - 메시지 하나가 JSON 한 줄이고 줄바꿈(\n)으로 구분한다. 메시지 안에는 줄바꿈을 넣지 않는다.
+//   - stdout에는 MCP 메시지 외에는 아무것도 쓰지 않는다.
 
 import type { McpProtocolEngine } from './mcp-protocol.js';
-
-const HEADER_DELIMITER = '\r\n\r\n';
-const CONTENT_LENGTH_RE = /^Content-Length:\s*(\d+)\s*$/im;
 
 export class AirStdioTransport {
   private engine: McpProtocolEngine;
@@ -44,58 +43,25 @@ export class AirStdioTransport {
     process.stdin.resume();
   }
 
-  /** 메시지를 stdout으로 전송한다 (Content-Length 프레이밍). */
+  /** 메시지를 stdout으로 전송한다 (JSON 한 줄 + 줄바꿈). */
   private write(message: any): void {
-    const json = JSON.stringify(message);
-    const header = `Content-Length: ${Buffer.byteLength(json, 'utf-8')}${HEADER_DELIMITER}`;
-    process.stdout.write(header + json);
+    // JSON.stringify는 문자열 안의 줄바꿈을 \n으로 이스케이프하므로 한 줄로 나간다
+    process.stdout.write(JSON.stringify(message) + '\n');
   }
 
-  /** 버퍼에서 완전한 메시지를 추출하고 처리한다. */
+  /** 버퍼에서 완성된 줄을 꺼내 메시지로 처리한다. */
   private processBuffer(): void {
-    while (true) {
-      // 헤더 구분자 찾기
-      const headerEnd = this.buffer.indexOf(HEADER_DELIMITER);
-      if (headerEnd === -1) break;
+    let newline = this.buffer.indexOf('\n');
+    while (newline !== -1) {
+      // CRLF로 보내는 클라이언트도 받는다
+      const line = this.buffer.slice(0, newline).replace(/\r$/, '');
+      this.buffer = this.buffer.slice(newline + 1);
 
-      // Content-Length 파싱
-      const headerBlock = this.buffer.slice(0, headerEnd);
-      const match = headerBlock.match(CONTENT_LENGTH_RE);
-      if (!match) {
-        // 헤더가 올바르지 않으면 해당 부분 버리기
-        this.buffer = this.buffer.slice(headerEnd + HEADER_DELIMITER.length);
-        continue;
-      }
+      // 빈 줄은 메시지가 아니므로 건너뛴다
+      if (line.trim() !== '') this.handleMessage(line);
 
-      const contentLength = parseInt(match[1], 10);
-      const bodyStart = headerEnd + HEADER_DELIMITER.length;
-      const bodyEnd = bodyStart + contentLength;
-
-      // 본문이 아직 다 안 왔으면 대기
-      if (Buffer.byteLength(this.buffer.slice(bodyStart), 'utf-8') < contentLength) break;
-
-      // 본문 추출
-      const body = this.buffer.slice(bodyStart, bodyStart + this.getCharLength(this.buffer, bodyStart, contentLength));
-      this.buffer = this.buffer.slice(bodyStart + this.getCharLength(this.buffer, bodyStart, contentLength));
-
-      // JSON-RPC 메시지 처리
-      this.handleMessage(body);
+      newline = this.buffer.indexOf('\n');
     }
-  }
-
-  /** UTF-8 바이트 길이에 해당하는 문자 길이를 반환한다. */
-  private getCharLength(str: string, start: number, byteLength: number): number {
-    let bytes = 0;
-    let chars = 0;
-    for (let i = start; i < str.length && bytes < byteLength; i++) {
-      const code = str.charCodeAt(i);
-      if (code <= 0x7f) bytes += 1;
-      else if (code <= 0x7ff) bytes += 2;
-      else if (code >= 0xd800 && code <= 0xdbff) { bytes += 4; i++; } // surrogate pair
-      else bytes += 3;
-      chars++;
-    }
-    return chars;
   }
 
   /** 개별 메시지를 파싱하고 프로토콜 엔진에 전달한다. */
