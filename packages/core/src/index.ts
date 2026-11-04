@@ -97,6 +97,7 @@ export type {
   AirPromptDef,
   AirPromptArg,
   AirPromptMessage,
+  AirPromptContent,
   MiddlewareContext,
   MiddlewareResult,
   BeforeMiddleware,

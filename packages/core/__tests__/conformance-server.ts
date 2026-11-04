@@ -165,9 +165,16 @@ const server = defineServer({
     }),
     definePrompt('test_prompt_with_embedded_resource', {
       description: 'A prompt with embedded resource',
-      arguments: [],
-      handler: () => [
+      arguments: [{ name: 'resourceUri', description: 'URI of the resource to embed', required: true }],
+      handler: ({ resourceUri }) => [
         { role: 'user', content: 'Here is a resource reference' },
+        {
+          role: 'user',
+          content: {
+            type: 'resource',
+            resource: { uri: resourceUri, mimeType: 'text/plain', text: 'Embedded resource content for testing.' },
+          },
+        },
       ],
     }),
     definePrompt('test_prompt_with_image', {
@@ -175,6 +182,7 @@ const server = defineServer({
       arguments: [],
       handler: () => [
         { role: 'user', content: 'Here is an image prompt' },
+        { role: 'user', content: { type: 'image', data: TINY_PNG_B64, mimeType: 'image/png' } },
       ],
     }),
   ],

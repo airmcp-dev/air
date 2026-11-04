@@ -131,7 +131,7 @@ interface AirPromptArg {
 ```typescript
 interface AirPromptMessage {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | AirPromptContent;  // 객체: text | image | audio | resource | resource_link
 }
 ```
 

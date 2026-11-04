@@ -18,7 +18,19 @@ export interface AirPromptArg {
   required?: boolean;
 }
 
+/**
+ * 프롬프트 메시지 콘텐츠 (MCP PromptMessage.content).
+ * 문자열은 text로 감싸고, 객체(image/audio/resource/resource_link)는 그대로 전달한다.
+ */
+export type AirPromptContent =
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mimeType: string }
+  | { type: 'audio'; data: string; mimeType: string }
+  | { type: 'resource'; resource: { uri: string; mimeType?: string; text?: string; blob?: string } }
+  | { type: 'resource_link'; uri: string; name?: string; description?: string; mimeType?: string };
+
 export interface AirPromptMessage {
   role: 'user' | 'assistant';
-  content: string;
+  /** 문자열(= text) 또는 콘텐츠 객체 */
+  content: string | AirPromptContent;
 }

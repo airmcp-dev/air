@@ -11,5 +11,3 @@ server:
   - tools-call-elicitation       # elicitation/create (서버발 요청)
   - elicitation-sep1034-defaults
   - elicitation-sep1330-enums
-  - prompts-get-embedded-resource  # AirPromptMessage.content가 string 전용
-  - prompts-get-with-image         # AirPromptMessage.content가 string 전용

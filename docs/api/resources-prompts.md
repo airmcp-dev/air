@@ -66,7 +66,7 @@ interface AirPromptDef {
 }
 
 interface AirPromptArg { name: string; description?: string; required?: boolean; }
-interface AirPromptMessage { role: 'user' | 'assistant'; content: string; }
+interface AirPromptMessage { role: 'user' | 'assistant'; content: string | AirPromptContent; }  // 객체: text|image|audio|resource|resource_link
 ```
 
 ::: info

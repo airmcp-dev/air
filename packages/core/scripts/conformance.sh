@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 PORT=19789
 OUT_DIR="${CONFORMANCE_OUT:-conformance-results}"
 
-npx -y tsx __tests__/conformance-server.ts > /tmp/air-conformance-server.log 2>&1 &
+TSX_DISABLE_CACHE=1 npx -y tsx __tests__/conformance-server.ts > /tmp/air-conformance-server.log 2>&1 &
 SERVER_PID=$!
 trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
 

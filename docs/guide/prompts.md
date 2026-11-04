@@ -73,11 +73,28 @@ interface AirPromptArg {
 ```typescript
 interface AirPromptMessage {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | AirPromptContent;
 }
+
+type AirPromptContent =
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mimeType: string }
+  | { type: 'audio'; data: string; mimeType: string }
+  | { type: 'resource'; resource: { uri: string; mimeType?: string; text?: string; blob?: string } }
+  | { type: 'resource_link'; uri: string; name?: string; description?: string; mimeType?: string };
 ```
 
-Internally converted to `{ role, content: { type: 'text', text: content } }` when registered with MCP SDK.
+A string is sent as `{ type: 'text', text }`. A content object is passed through unchanged, so a prompt can carry images or embedded resources:
+
+```typescript
+definePrompt('review-screenshot', {
+  arguments: [{ name: 'uri', required: true }],
+  handler: ({ uri }) => [
+    { role: 'user', content: 'Review this screen.' },
+    { role: 'user', content: { type: 'resource', resource: { uri, mimeType: 'text/plain', text: '...' } } },
+  ],
+});
+```
 
 ## Arguments
 

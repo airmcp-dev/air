@@ -220,7 +220,7 @@ export function createWorkersFetchHandler(config: WorkersTransportConfig) {
             description: prompt.description || '',
             messages: messages.map(m => ({
               role: m.role,
-              content: { type: 'text', text: m.content },
+              content: typeof m.content === 'string' ? { type: 'text', text: m.content } : m.content,
             })),
           },
         }, { headers });

@@ -15,7 +15,7 @@ export type {
   AirResourceLink,
 } from './tool.js';
 export type { AirResourceDef, AirResourceContext, AirResourceContent } from './resource.js';
-export type { AirPromptDef, AirPromptArg, AirPromptMessage } from './prompt.js';
+export type { AirPromptDef, AirPromptArg, AirPromptMessage, AirPromptContent } from './prompt.js';
 export type {
   MiddlewareContext,
   MiddlewareResult,

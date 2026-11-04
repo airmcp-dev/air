@@ -479,7 +479,8 @@ export class McpProtocolEngine {
       description: prompt.description || '',
       messages: messages.map(m => ({
         role: m.role,
-        content: { type: 'text', text: m.content },
+        // 문자열은 text로 감싸고, 콘텐츠 객체(image/audio/resource/resource_link)는 그대로
+        content: typeof m.content === 'string' ? { type: 'text', text: m.content } : m.content,
       })),
     };
   }

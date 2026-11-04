@@ -73,11 +73,28 @@ interface AirPromptArg {
 ```typescript
 interface AirPromptMessage {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | AirPromptContent;
 }
+
+type AirPromptContent =
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mimeType: string }
+  | { type: 'audio'; data: string; mimeType: string }
+  | { type: 'resource'; resource: { uri: string; mimeType?: string; text?: string; blob?: string } }
+  | { type: 'resource_link'; uri: string; name?: string; description?: string; mimeType?: string };
 ```
 
-내부적으로 MCP SDK에 등록될 때 `{ role, content: { type: 'text', text: content } }` 형식으로 변환됩니다.
+문자열은 `{ type: 'text', text }`로 변환되고, 콘텐츠 객체는 그대로 전달됩니다. 이미지나 임베디드 리소스를 담은 프롬프트를 만들 수 있습니다:
+
+```typescript
+definePrompt('review-screenshot', {
+  arguments: [{ name: 'uri', required: true }],
+  handler: ({ uri }) => [
+    { role: 'user', content: '이 화면을 리뷰해줘.' },
+    { role: 'user', content: { type: 'resource', resource: { uri, mimeType: 'text/plain', text: '...' } } },
+  ],
+});
+```
 
 ## 인자
 
