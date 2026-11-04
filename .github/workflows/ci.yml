@@ -27,7 +27,8 @@ jobs:
       # examples/*는 tsconfig 없는 예제·서버 띄우는 스크립트라 CI 범위에서 제외
       - run: pnpm turbo run build --filter='./packages/*'
       - run: pnpm turbo run lint --filter='./packages/*'
-      - run: pnpm turbo run test --filter='./packages/*'
+      # vitest.config.ts의 include가 루트 기준이라 패키지 디렉토리에서는 테스트를 못 찾는다 → 루트에서 한 번에
+      - run: pnpm exec vitest run packages
 
   conformance:
     name: MCP conformance (core)
