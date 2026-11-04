@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: build · lint · test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      # packages/hive는 비공개(gitignore)라 lockfile의 importer와 워크스페이스가 다름 → frozen 불가
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm build
+      - run: pnpm lint
+      - run: pnpm test
+
+  conformance:
+    name: MCP conformance (core)
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      # packages/hive는 비공개(gitignore)라 lockfile의 importer와 워크스페이스가 다름 → frozen 불가
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm --filter @airmcp-dev/core build
+      - name: Run conformance suite against baseline
+        run: pnpm --filter @airmcp-dev/core conformance
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: conformance-results
+          path: packages/core/conformance-results
+          if-no-files-found: ignore

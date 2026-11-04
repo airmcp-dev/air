@@ -45,6 +45,7 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
+    "conformance": "bash scripts/conformance.sh",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
