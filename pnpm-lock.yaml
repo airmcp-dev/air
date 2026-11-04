@@ -80,8 +80,8 @@ importers:
   packages/cli:
     dependencies:
       '@airmcp-dev/core':
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: workspace:*
+        version: link:../core
       chalk:
         specifier: ^5.3.0
         version: 5.6.2
@@ -89,6 +89,9 @@ importers:
         specifier: ^12.1.0
         version: 12.1.0
     devDependencies:
+      '@airmcp-dev/gateway':
+        specifier: workspace:*
+        version: link:../gateway
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.39

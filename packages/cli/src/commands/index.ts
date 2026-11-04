@@ -14,3 +14,4 @@ export { disconnectCommand } from './disconnect.js';
 export { checkCommand } from './check.js';
 export { licenseCommand } from './license.js';
 export { updateCommand } from './update.js';
+export { bridgeCommand } from './bridge.js';

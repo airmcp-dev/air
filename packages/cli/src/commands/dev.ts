@@ -63,14 +63,14 @@ export const devCommand = new Command('dev')
   .description('Start MCP server in development mode (hot reload)')
   .option('-p, --port <port>', 'HTTP/SSE port', '3000')
   .option('-t, --transport <type>', 'Transport: stdio | http | sse', 'stdio')
-  .option('-c, --console', 'Open interactive test console (requires SSE transport)')
+  .option('-c, --console', 'Open interactive test console (requires http transport)')
   .action(async (opts: { port: string; transport: string; console?: boolean }) => {
     const cwd = process.cwd();
 
-    // 콘솔 모드는 SSE transport가 필요
-    if (opts.console && opts.transport === 'stdio') {
-      opts.transport = 'sse';
-      printer.info('Console mode requires SSE transport — switching to SSE.');
+    // 콘솔 모드는 http transport가 필요 (POST /mcp)
+    if (opts.console && opts.transport !== 'http') {
+      opts.transport = 'http';
+      printer.info('Console mode requires http transport — switching to http.');
     }
 
     // ── 1. 엔트리 파일 찾기 ──

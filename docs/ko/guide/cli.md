@@ -133,6 +133,26 @@ npx @airmcp-dev/cli connect vscode --transport http --port 3510
 | `-p, --port <port>` | `3000` | HTTP/SSE 포트 |
 | `-H, --host <host>` | `localhost` | 원격 서버 호스트 |
 | `--proxy <path>` | — | mcp-proxy.js 경로 (stdio→SSE 브릿지) |
+| `-g, --gateway <url...>` | — | 이 서버 대신 `air bridge`를 이 게이트웨이(들)로 등록 (v0.3.0+) |
+| `--gateway-token <token>` | — | 게이트웨이 Bearer 토큰 |
+
+## bridge
+
+모든 요청을 air 게이트웨이로 전달하는 stdio MCP 서버를 띄웁니다. 게이트웨이를 여러 개 주면 현재 것이 죽었을 때 다음으로 넘어가고, 우선순위가 높은 것이 복구되면 되돌아갑니다. 서버 주소를 하나만 받는 클라이언트(Claude Desktop, Cursor)에 nginx나 VIP 없이 게이트웨이 HA를 붙이는 방법입니다.
+
+```bash
+npx @airmcp-dev/cli bridge --gateway http://gw1:4000 --gateway http://gw2:4000 --token $TOKEN
+npx @airmcp-dev/cli connect claude-desktop --gateway http://gw1:4000 --gateway http://gw2:4000
+```
+
+| 옵션 | 기본값 | 설명 |
+|------|--------|------|
+| `-g, --gateway <url...>` | 필수 | 게이트웨이 베이스 URL (페일오버 순서) |
+| `--token <token>` | — | 게이트웨이에 보낼 Bearer 토큰 |
+| `--timeout <ms>` | `60000` | 요청당 타임아웃 |
+| `--failback-probe <ms>` | `10000` | 우선순위 높은 게이트웨이 복구 확인 주기 |
+
+`tools/call`은 스트리밍되어 progress/log 알림과 elicitation 요청이 클라이언트까지 가고, 클라이언트의 답은 게이트웨이로 되돌아갑니다. 페일오버 시 클라이언트의 `initialize`를 새 게이트웨이에 다시 보내고, 아직 아무것도 못 받은 요청은 한 번 재시도합니다. 로그는 stderr로, stdout엔 MCP 메시지만 나갑니다.
 
 ## disconnect
 

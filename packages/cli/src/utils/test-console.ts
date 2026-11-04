@@ -44,20 +44,45 @@ function parseArgs(tokens: string[]): Record<string, any> {
   return args;
 }
 
-/** SSE 클라이언트로 서버에 연결하여 테스트 콘솔 제공 */
+/** Streamable HTTP(POST /mcp)로 서버와 말하는 최소 MCP 클라이언트 — SDK 없이 */
+class RawMcpClient {
+  private seq = 0;
+  constructor(private readonly endpoint: string) {}
+
+  private async rpc(method: string, params?: Record<string, any>): Promise<any> {
+    const res = await fetch(this.endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: ++this.seq, method, ...(params ? { params } : {}) }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = await res.json() as any;
+    if (body.error) throw new Error(`${body.error.message} (${body.error.code})`);
+    return body.result;
+  }
+
+  async connect(): Promise<void> {
+    await this.rpc('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'air-dev-console', version: '1.0.0' } });
+    await fetch(this.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) }).catch(() => {});
+  }
+  listTools() { return this.rpc('tools/list'); }
+  callTool(params: { name: string; arguments: Record<string, any> }) { return this.rpc('tools/call', params); }
+  listResources() { return this.rpc('resources/list'); }
+  listPrompts() { return this.rpc('prompts/list'); }
+  async close(): Promise<void> { /* stateless — 닫을 연결 없음 */ }
+}
+
+/** 서버에 연결하여 테스트 콘솔 제공 (http transport, POST /mcp) */
 export async function startTestConsole(options: TestConsoleOptions): Promise<void> {
-  const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
-  const { SSEClientTransport } = await import('@modelcontextprotocol/sdk/client/sse.js');
+  let client: RawMcpClient | null = null;
 
-  let client: InstanceType<typeof Client> | null = null;
-
-  // SSE 연결 시도 (서버가 준비될 때까지 재시도)
+  // 연결 시도 (서버가 준비될 때까지 재시도)
   async function connect(): Promise<boolean> {
     for (let attempt = 0; attempt < 10; attempt++) {
       try {
-        const transport = new SSEClientTransport(new URL(`${options.serverUrl}/sse`));
-        client = new Client({ name: 'air-dev-console', version: '1.0.0' });
-        await client.connect(transport);
+        const c = new RawMcpClient(`${options.serverUrl.replace(/\/+$/, '')}/mcp`);
+        await c.connect();
+        client = c;
         return true;
       } catch {
         await new Promise((r) => setTimeout(r, 1000));
@@ -72,7 +97,7 @@ export async function startTestConsole(options: TestConsoleOptions): Promise<voi
   const connected = await connect();
   if (!connected || !client) {
     console.log('  \x1b[31mCould not connect to server\x1b[0m');
-    console.log('  Make sure the server is running with SSE transport.\n');
+    console.log('  Make sure the server is running with http transport.\n');
     return;
   }
 

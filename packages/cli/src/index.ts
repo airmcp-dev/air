@@ -28,6 +28,7 @@ import {
   checkCommand,
   licenseCommand,
   updateCommand,
+  bridgeCommand,
 } from './commands/index.js';
 import { notifyUpdateIfAvailable } from './commands/update.js';
 
@@ -46,6 +47,7 @@ program
 
 // ── 명령어 등록 ──
 program.addCommand(createCommand);
+program.addCommand(bridgeCommand);
 program.addCommand(addCommand);
 program.addCommand(devCommand);
 program.addCommand(startCommand);

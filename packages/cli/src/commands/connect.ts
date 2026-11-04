@@ -33,9 +33,17 @@ function buildServerEntry(
   cwd: string,
   transport: string,
   port: string,
-  opts: { host?: string; proxyPath?: string },
+  opts: { host?: string; proxyPath?: string; gateways?: string[]; gatewayToken?: string },
 ): Record<string, any> {
   const host = opts.host || 'localhost';
+
+  // 게이트웨이 경유: air bridge를 stdio 서버로 등록 (여러 게이트웨이면 클라이언트 측 페일오버)
+  if (opts.gateways?.length) {
+    const args = ['-y', '@airmcp-dev/cli', 'bridge'];
+    for (const url of opts.gateways) args.push('--gateway', url);
+    if (opts.gatewayToken) args.push('--token', opts.gatewayToken);
+    return { command: 'npx', args };
+  }
 
   if (transport === 'stdio') {
     return {
@@ -74,7 +82,9 @@ export const connectCommand = new Command('connect')
   .option('-p, --port <port>', 'Port for http/sse transport', '3000')
   .option('-H, --host <host>', 'Host for remote server (default: localhost)')
   .option('--proxy <path>', 'Path to mcp-proxy.js for SSE via stdio-to-SSE proxy')
-  .action(async (client: string, opts: { name?: string; transport: string; port: string; host?: string; proxy?: string }) => {
+  .option('-g, --gateway <url...>', 'Connect through air gateway(s) via `air bridge` (repeat for failover)')
+  .option('--gateway-token <token>', 'Bearer token for the gateway')
+  .action(async (client: string, opts: { name?: string; transport: string; port: string; host?: string; proxy?: string; gateway?: string[]; gatewayToken?: string }) => {
     const cwd = process.cwd();
 
     // ── 1. 클라이언트 경로 해석 ──
@@ -114,6 +124,8 @@ export const connectCommand = new Command('connect')
     const entry = buildServerEntry(cwd, opts.transport, opts.port, {
       host: opts.host,
       proxyPath: opts.proxy,
+      gateways: opts.gateway,
+      gatewayToken: opts.gatewayToken,
     });
 
     // 이미 등록되어 있으면 덮어쓰기 경고
