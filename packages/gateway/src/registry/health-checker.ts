@@ -92,7 +92,8 @@ export class HealthChecker {
       const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
 
       try {
-        const res = await fetch(`${conn.url}/health`, {
+        // url이 http://host:port/mcp 처럼 엔드포인트까지 포함해도 /health는 origin 기준
+        const res = await fetch(new URL('/health', conn.url), {
           signal: controller.signal,
         });
         clearTimeout(timeout);

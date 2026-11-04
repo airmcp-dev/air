@@ -16,17 +16,20 @@ import { Gateway } from '@airmcp-dev/gateway';
 const gateway = new Gateway(config);
 ```
 
-### GatewayConfig
+### GatewayOptions
 
 ```typescript
-interface GatewayConfig {
-  name?: string;
-  port?: number;
+interface GatewayOptions {
+  name?: string;                  // 기본: 'air-gateway'
+  port?: number;                  // 기본: 4000 (0 = 임의 포트)
+  host?: string;                  // 기본: '127.0.0.1'
+  endpoint?: string;              // 기본: '/mcp'
+  allowedOrigins?: string[];      // 추가 허용 브라우저 Origin. '*'는 전부
   healthCheckInterval?: number;   // ms, 기본: 15000
-  healthCheckTimeout?: number;    // ms, 기본: 5000
-  initialDelayMs?: number;        // ms, 기본: 10000 (v0.4.0+)
   balancer?: BalancerStrategy;    // 기본: 'round-robin'
-  requestTimeout?: number;        // ms
+  requestTimeout?: number;        // upstream 호출당 ms, 기본: 30000
+  discoverOnStart?: boolean;      // 기본: true
+  pendingTtlMs?: number;          // 답 없는 elicitation 보관 시간 ms, 기본: 300000
 }
 ```
 
@@ -34,13 +37,23 @@ interface GatewayConfig {
 
 ```typescript
 class Gateway {
-  start(): Promise<void>;
-  stop(): Promise<void>;
-  register(server: ServerEntry): void;
+  register(entry: { id: string; name: string; connection: HttpConnection; weight?: number }): ServerEntry;
   unregister(id: string): void;
-  list(): ServerEntry[];
+  discover(id?: string): Promise<void>;      // 백엔드의 도구/리소스/프롬프트 (재)발견
+  start(): Promise<void>;                    // discover → 헬스체크 → 리슨
+  stop(): Promise<void>;
+  handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void>;  // 기존 http 서버에 끼우기
+  status(): { name; servers; tools; pendingRequests; health };
+  readonly port: number;                     // 실제 리슨 포트
+  readonly registry: ServerRegistry;
+  readonly toolIndex: ToolIndex;
+  readonly router: RequestRouter;
+  readonly balancer: LoadBalancer;
+  readonly healthChecker: HealthChecker;
 }
 ```
+
+`connection.type === 'http'`(Streamable HTTP) 백엔드만 받습니다.
 
 ## ServerEntry
 

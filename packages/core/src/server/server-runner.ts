@@ -29,6 +29,10 @@ export class ServerRunner {
   private resources: AirResourceDef[] = [];
   private prompts: AirPromptDef[] = [];
   private stdioTransport: AirStdioTransport | null = null;
+  /** http/sse transport의 리스너 — stop()에서 닫는다 */
+  private httpServer: import('node:http').Server | null = null;
+  /** sse transport의 세션 매니저 — stop()에서 전부 닫는다 */
+  private sseSessions: AirSSESessionManager | null = null;
 
   constructor(config: AirConfig, middlewareChain: MiddlewareChain) {
     this.config = config;
@@ -128,6 +132,7 @@ export class ServerRunner {
     const server = createServer(async (req, res) => {
       await httpTransport.handleRequest(req, res);
     });
+    this.httpServer = server;
 
     server.listen(port, host, () => {
       console.log(`[air] HTTP server listening on port ${port} (${host})`);
@@ -266,6 +271,8 @@ export class ServerRunner {
     });
 
     const host = this.config.transport?.host ?? '127.0.0.1';
+    this.httpServer = httpServer;
+    this.sseSessions = sessionManager;
     httpServer.listen(port, host, () => {
       console.log(`[air] SSE server listening on port ${port} (${host})`);
     });
@@ -322,6 +329,20 @@ export class ServerRunner {
   async stop() {
     this.serverCtx.status = 'stopping';
     this.stdioTransport?.stop();
+    if (this.sseSessions) {
+      await this.sseSessions.closeAll();
+      this.sseSessions = null;
+    }
+    if (this.httpServer) {
+      const server = this.httpServer;
+      this.httpServer = null;
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+        // 유휴 keep-alive 연결은 바로, 진행 중 연결은 잠시 기다렸다 끊는다 (graceful drain의 최소 형태)
+        server.closeIdleConnections?.();
+        setTimeout(() => server.closeAllConnections?.(), 2_000).unref();
+      });
+    }
     this.serverCtx.status = 'stopped';
     console.log(`[air] "${this.config.name}" stopped`);
   }

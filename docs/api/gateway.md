@@ -15,17 +15,20 @@ import { Gateway } from '@airmcp-dev/gateway';
 const gateway = new Gateway(config);
 ```
 
-### GatewayConfig
+### GatewayOptions
 
 ```typescript
-interface GatewayConfig {
-  name?: string;
-  port?: number;
+interface GatewayOptions {
+  name?: string;                  // default: 'air-gateway'
+  port?: number;                  // default: 4000 (0 = random)
+  host?: string;                  // default: '127.0.0.1'
+  endpoint?: string;              // default: '/mcp'
+  allowedOrigins?: string[];      // extra browser Origins; '*' for all
   healthCheckInterval?: number;   // ms, default: 15000
-  healthCheckTimeout?: number;    // ms, default: 5000
-  initialDelayMs?: number;        // ms, default: 10000 (v0.4.0+)
   balancer?: BalancerStrategy;    // default: 'round-robin'
-  requestTimeout?: number;        // ms
+  requestTimeout?: number;        // ms per upstream call, default: 30000
+  discoverOnStart?: boolean;      // default: true
+  pendingTtlMs?: number;          // ms to keep an unanswered elicitation, default: 300000
 }
 ```
 
@@ -33,13 +36,23 @@ interface GatewayConfig {
 
 ```typescript
 class Gateway {
-  start(): Promise<void>;
-  stop(): Promise<void>;
-  register(server: ServerEntry): void;
+  register(entry: { id: string; name: string; connection: HttpConnection; weight?: number }): ServerEntry;
   unregister(id: string): void;
-  list(): ServerEntry[];
+  discover(id?: string): Promise<void>;      // (re)read tools/resources/prompts from backends
+  start(): Promise<void>;                    // discover → health checks → listen
+  stop(): Promise<void>;
+  handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void>;  // mount in your own http server
+  status(): { name; servers; tools; pendingRequests; health };
+  readonly port: number;                     // actual listen port
+  readonly registry: ServerRegistry;
+  readonly toolIndex: ToolIndex;
+  readonly router: RequestRouter;
+  readonly balancer: LoadBalancer;
+  readonly healthChecker: HealthChecker;
 }
 ```
+
+Only `connection.type === 'http'` (Streamable HTTP) backends are accepted.
 
 ## ServerEntry
 

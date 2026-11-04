@@ -1,7 +1,7 @@
 {
   "name": "@airmcp-dev/gateway",
-  "version": "0.3.0",
-  "description": "MCP reverse proxy, server registry, and request router",
+  "version": "0.4.0",
+  "description": "MCP gateway — Streamable HTTP front, upstream routing/load balancing, stream passthrough, health checks",
   "type": "module",
   "files": ["dist", "README.md", "LICENSE"],
   "main": "dist/index.js",
@@ -19,8 +19,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@airmcp-dev/core": "^0.2.0",
-    "@modelcontextprotocol/sdk": "^1.29.0"
+    "@airmcp-dev/core": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.5.0",

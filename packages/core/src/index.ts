@@ -127,3 +127,7 @@ export type {
 // 서버 → 클라이언트 채널 (커스텀 transport용)
 export type { AirOutbound } from './protocol/outbound.js';
 export { PendingRequests, isJsonRpcResponse } from './protocol/outbound.js';
+
+// 프로토콜 상수 · Origin 검증 (gateway 등 다른 패키지에서 재사용)
+export { PROTOCOL_VERSIONS, SUPPORTED_VERSIONS, ErrorCodes } from './protocol/mcp-protocol.js';
+export { checkOrigin, isAllowedOrigin } from './protocol/origin.js';

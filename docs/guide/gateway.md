@@ -1,18 +1,16 @@
 # Gateway
 
-Gateway is a reverse proxy that unifies multiple MCP servers behind a single endpoint. It provides server registry, tool indexing, request routing, health checks, and load balancing.
+Gateway puts one Streamable HTTP endpoint in front of several MCP servers. Clients see a single MCP server; behind it, Gateway aggregates the tool, resource and prompt lists, routes each call to a backend, load-balances replicated tools, excludes unhealthy backends, and passes streaming notifications and elicitation through unchanged.
 
 ## Overview
 
-When you have multiple MCP servers, Gateway provides a single entry point:
-
 ```
-Client → Gateway (:4000) → Server A - search   (:3510, SSE)
-                          → Server B - files    (:3511, SSE)
-                          → Server C - analytics (stdio)
+Client → Gateway (:4000/mcp) → search-1   (:3510, http)
+                             → search-2   (:3511, http)   ← replica of search-1, round-robin
+                             → files      (:3512, http)
 ```
 
-Clients connect to one Gateway and access tools from all registered servers.
+Backends must speak Streamable HTTP (air `transport: { type: 'http' }`). Legacy SSE and stdio backends are not supported as upstreams yet.
 
 ## Installation
 
@@ -28,183 +26,112 @@ import { Gateway } from '@airmcp-dev/gateway';
 const gateway = new Gateway({
   name: 'my-gateway',
   port: 4000,
+  host: '127.0.0.1',            // '0.0.0.0' in a container
   healthCheckInterval: 15_000,
   balancer: 'round-robin',
   requestTimeout: 30_000,
 });
 
-gateway.register({
-  id: 'search-1',
-  name: 'search',
-  transport: 'sse',
-  connection: { type: 'sse', url: 'http://localhost:3510' },
-});
+gateway.register({ id: 'search-1', name: 'search', connection: { type: 'http', url: 'http://localhost:3510/mcp' } });
+gateway.register({ id: 'search-2', name: 'search', connection: { type: 'http', url: 'http://localhost:3511/mcp' } });
+gateway.register({ id: 'files',    name: 'files',  connection: { type: 'http', url: 'http://localhost:3512/mcp' } });
 
-gateway.register({
-  id: 'files-1',
-  name: 'files',
-  transport: 'stdio',
-  connection: { type: 'stdio', command: 'node', args: ['./servers/files/dist/index.js'] },
-});
-
-await gateway.start();
+await gateway.start();   // discovers tools/resources/prompts, starts health checks, listens
 ```
 
-## GatewayConfig
+Point any MCP client at `http://localhost:4000/mcp`.
+
+## GatewayOptions
 
 ```typescript
-interface GatewayConfig {
-  name?: string;
-  port?: number;
+interface GatewayOptions {
+  name?: string;                  // serverInfo.name shown to clients (default: 'air-gateway')
+  port?: number;                  // default: 4000 (0 = random; read gateway.port after start)
+  host?: string;                  // default: '127.0.0.1'
+  endpoint?: string;              // default: '/mcp'
+  allowedOrigins?: string[];      // browser Origins allowed besides loopback; '*' for all
   healthCheckInterval?: number;   // ms, default: 15000
-  healthCheckTimeout?: number;    // ms, default: 5000
-  initialDelayMs?: number;        // ms, default: 10000 (v0.4.0+, cold start safe)
-  balancer?: BalancerStrategy;
-  requestTimeout?: number;        // ms
+  balancer?: BalancerStrategy;    // 'round-robin' | 'random' | 'weighted'
+  requestTimeout?: number;        // ms per upstream call, default: 30000
+  discoverOnStart?: boolean;      // default: true
+  pendingTtlMs?: number;          // how long to wait for a client's elicitation reply, default: 5 min
 }
 ```
 
-## ServerEntry
+## Registering backends
 
 ```typescript
-interface ServerEntry {
-  id: string;
-  name: string;
-  transport: 'stdio' | 'http' | 'sse';
-  connection: StdioConnection | HttpConnection;
-  tools: ToolEntry[];             // Auto-populated after connection
-  status: ServerStatus;
-  lastHealthCheck?: Date;
-  metadata?: Record<string, any>;
-}
+gateway.register({
+  id: 'search-2',                 // unique
+  name: 'search',                 // display name
+  connection: { type: 'http', url: 'http://localhost:3511/mcp', headers: { Authorization: 'Bearer …' } },
+  weight: 2,                      // for the 'weighted' balancer
+});
 
-// Connection types
-interface StdioConnection {
-  type: 'stdio';
-  command: string;
-  args?: string[];
-  cwd?: string;
-  env?: Record<string, string>;
-}
-
-interface HttpConnection {
-  type: 'http' | 'sse';
-  url: string;
-  headers?: Record<string, string>;
-}
-
-type ServerStatus = 'registered' | 'connecting' | 'connected' | 'error' | 'stopped';
+gateway.unregister('search-2');
+await gateway.discover();         // re-read tools/resources/prompts from every backend
+await gateway.discover('files');  // one backend
 ```
 
-Gateway supports mixing stdio, SSE, and HTTP servers.
+`register()` throws for `stdio` and `sse` connections.
 
-## Server registry
+## What Gateway answers itself vs. forwards
 
-```typescript
-// Register
-gateway.register({ id: 'search-1', name: 'search', ... });
+| Method | Handling |
+|--------|----------|
+| `initialize`, `ping` | Answered by Gateway. Client capabilities are remembered and forwarded to backends on every `tools/call` (in `_meta`), so backends know whether the client supports elicitation. |
+| `tools/list`, `resources/list`, `resources/templates/list`, `prompts/list` | Aggregated from the lists discovered at `start()` / `discover()`. A tool name that appears on several backends is listed once and treated as replicated. |
+| `tools/call` | Routed by tool name → load balancer → backend. Streamed when the client accepts SSE (below). |
+| `resources/read`, `resources/subscribe`, `prompts/get`, `completion/complete` | Forwarded to a backend that listed that URI / prompt (resource templates are matched too). |
+| `logging/setLevel` | Forwarded to every backend. |
+| Notifications from the client | Accepted with `202`, not forwarded. |
+| JSON-RPC batch | Rejected (`-32600`). |
 
-// Unregister
-gateway.unregister('search-1');
+## Streaming passthrough
 
-// List all servers
-const servers = gateway.list();
-// [{ id: 'search-1', name: 'search', status: 'connected', tools: [...] }, ...]
-```
+When a client sends `tools/call` with `Accept: text/event-stream`, Gateway calls the backend the same way and relays every event on the backend's SSE stream to the client's stream: `notifications/progress`, `notifications/message`, and server-initiated requests such as `elicitation/create`. The final JSON-RPC response ends the stream.
 
-## Tool index
+Server-initiated requests get a Gateway-scoped id (`gw-N`) because backend ids can collide. The client answers by `POST`ing the JSON-RPC response to the Gateway endpoint, exactly as it would to a single server; Gateway maps the id back and forwards the response to the backend that asked. Unanswered requests are dropped after `pendingTtlMs`.
 
-Gateway auto-collects tool lists from registered servers:
+Clients that only accept `application/json` get the final result; the backend is called in JSON mode, so it sends no notifications and sees `ctx.elicit` as `undefined`.
 
-```typescript
-interface ToolEntry {
-  name: string;
-  description?: string;
-  serverId: string;
-  inputSchema?: Record<string, any>;
-}
-```
+If the client disconnects mid-call, the upstream request is aborted.
 
 ## Load balancing
 
-When multiple servers share the same name, load balancing is applied:
-
-```typescript
-const gateway = new Gateway({
-  balancer: 'round-robin',  // default
-});
-
-// Register 2 servers with the same name
-gateway.register({ id: 'search-1', name: 'search', ... });
-gateway.register({ id: 'search-2', name: 'search', ... });
-// → tool calls are routed alternately to search-1, search-2
-```
-
-### Balancer strategies
-
-```typescript
-type BalancerStrategy = 'round-robin' | 'least-connections' | 'weighted' | 'random';
-```
+Replicated tools (same name on several backends) are balanced per call:
 
 | Strategy | Description |
 |----------|-------------|
 | `round-robin` | Alternate in order (default) |
-| `least-connections` | Route to server with fewest active connections |
-| `weighted` | Weight-based distribution |
 | `random` | Random selection |
+| `weighted` | Proportional to `weight` given at `register()` |
+| `least-connections` | Accepted but currently falls back to round-robin |
+
+Backends whose status is not `connected` are skipped. If no backend for a tool is healthy, the call fails with `-32601`.
 
 ## Health checks
 
-```typescript
-const gateway = new Gateway({
-  healthCheckInterval: 15_000,  // every 15 seconds
-});
-```
-
-Health check result:
+Every `healthCheckInterval` ms Gateway fetches `/health` at each backend's origin (an air server answers it). A failing or slow (> 5 s) check moves the backend to `error`; a passing check moves it back to `connected`. The first check runs after a 10 s grace period so cold-starting backends aren't marked down.
 
 ```typescript
-interface HealthCheckResult {
-  serverId: string;
-  healthy: boolean;
-  latencyMs: number;
-  error?: string;
-  checkedAt: Date;
-}
+gateway.healthChecker.getAllResults();  // [{ serverId, healthy, latencyMs, error?, checkedAt }]
+await gateway.healthChecker.checkAll(); // run one round now
 ```
 
-Unhealthy servers are excluded from routing and re-included when they recover.
+`GET /` and `GET /health` on the Gateway itself return its status (servers, tools, pending requests, health results).
 
 ## Failover
 
-1. Server down → active requests timeout
-2. Health check transitions server to `error` status
-3. Subsequent requests route to remaining healthy servers
-4. Server recovers → health check passes → `connected` → routing pool restored
+1. A backend goes down → in-flight calls to it fail or time out.
+2. The next health check marks it `error`; it is excluded from routing.
+3. Calls to replicated tools keep flowing to the remaining backends; calls to tools that only it provided fail with "no healthy server".
+4. The backend comes back → health check passes → `connected` → back in rotation.
 
-## With defineServer
+## Embedding
 
-```typescript
-import { defineServer, defineTool } from '@airmcp-dev/core';
-import { Gateway } from '@airmcp-dev/gateway';
+`gateway.handleRequest(req, res)` is public, so the endpoint can be mounted inside an existing `node:http` server instead of `start()` listening on its own port.
 
-const searchServer = defineServer({
-  name: 'search',
-  transport: { type: 'sse', port: 3510 },
-  tools: [defineTool('search', { params: { query: 'string' }, handler: async ({ query }) => doSearch(query) })],
-});
+## Lower-level pieces
 
-const filesServer = defineServer({
-  name: 'files',
-  transport: { type: 'sse', port: 3511 },
-  tools: [defineTool('read-file', { params: { path: 'string' }, handler: async ({ path }) => readFile(path, 'utf-8') })],
-});
-
-await searchServer.start();
-await filesServer.start();
-
-const gateway = new Gateway({ port: 4000 });
-gateway.register({ id: 'search', name: 'search', transport: 'sse', connection: { type: 'sse', url: 'http://localhost:3510' } });
-gateway.register({ id: 'files', name: 'files', transport: 'sse', connection: { type: 'sse', url: 'http://localhost:3511' } });
-await gateway.start();
-```
+`ServerRegistry`, `ToolIndex`, `RequestRouter`, `LoadBalancer`, `HealthChecker` and `UpstreamClient` are exported for building a custom front. `McpProxy` (in-process `callTool()` routing without an HTTP front) is kept for compatibility.
