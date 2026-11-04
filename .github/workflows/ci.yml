@@ -24,9 +24,10 @@ jobs:
           cache: pnpm
       # packages/hive는 비공개(gitignore)라 lockfile의 importer와 워크스페이스가 다름 → frozen 불가
       - run: pnpm install --no-frozen-lockfile
-      - run: pnpm build
-      - run: pnpm lint
-      - run: pnpm test
+      # examples/*는 tsconfig 없는 예제·서버 띄우는 스크립트라 CI 범위에서 제외
+      - run: pnpm turbo run build --filter='./packages/*'
+      - run: pnpm turbo run lint --filter='./packages/*'
+      - run: pnpm turbo run test --filter='./packages/*'
 
   conformance:
     name: MCP conformance (core)
