@@ -70,6 +70,30 @@ function isZodSchema(value: any): boolean {
 
 /** Zod 스키마에서 JSON Schema를 추출한다 (v3 + v4 호환) */
 function zodToJsonSchemaProperty(schema: any): Record<string, any> {
+  const prop = zodTypeToJsonSchema(schema);
+  // .describe()가 optional/default/refine 같은 래퍼 쪽에 붙어도 설명을 살린다
+  const description = schema?._def?.description;
+  return description ? { ...prop, description } : prop;
+}
+
+/**
+ * JSON Schema에 null을 허용한다 (Zod .nullable()).
+ * 타입 배열(`type: ['number', 'null']`) 대신 `anyOf: [안쪽, { type: 'null' }]`로 감싼다. 타입 배열은 단일
+ * `type`만 받는 클라이언트(OpenAPI 부분집합으로 옮기는 Gemini 함수 선언 등)가 거부하거나 제약을 버릴 수 있다.
+ * 설명은 감싼 쪽에 둔다. 속성의 description을 바로 읽는 클라이언트가 지금처럼 보게 한다.
+ */
+function withNull(prop: Record<string, any>): Record<string, any> {
+  const { description, ...schema } = prop;
+  // {}는 이미 null을 허용한다
+  if (Object.keys(schema).length === 0) return prop;
+  return {
+    anyOf: [schema, { type: 'null' }],
+    ...(description !== undefined ? { description } : {}),
+  };
+}
+
+/** Zod 스키마의 타입 정보를 JSON Schema로 옮긴다 */
+function zodTypeToJsonSchema(schema: any): Record<string, any> {
   // Zod v4: ~standard.type으로 타입 정보 접근
   if ('~standard' in schema) {
     const std = schema['~standard'];
@@ -88,7 +112,7 @@ function zodToJsonSchemaProperty(schema: any): Record<string, any> {
     if (typeName === 'ZodString') return { type: 'string', ...(def.description ? { description: def.description } : {}) };
     if (typeName === 'ZodNumber') return { type: 'number', ...(def.description ? { description: def.description } : {}) };
     if (typeName === 'ZodBoolean') return { type: 'boolean', ...(def.description ? { description: def.description } : {}) };
-    if (typeName === 'ZodArray') return { type: 'array' };
+    if (typeName === 'ZodArray') return { type: 'array', items: zodToJsonSchemaProperty(def.type) };
     if (typeName === 'ZodObject') {
       // 중첩 object — shape에서 재귀 추출
       const shape = def.shape?.();
@@ -109,6 +133,14 @@ function zodToJsonSchemaProperty(schema: any): Record<string, any> {
     if (typeName === 'ZodDefault') {
       const inner = zodToJsonSchemaProperty(def.innerType);
       return { ...inner, default: def.defaultValue() };
+    }
+    // .nullable() — 안쪽 타입 + null
+    if (typeName === 'ZodNullable') {
+      return withNull(zodToJsonSchemaProperty(def.innerType));
+    }
+    // .refine() / .transform() / .superRefine() / z.preprocess() — 안쪽 스키마의 타입을 따른다
+    if (typeName === 'ZodEffects') {
+      return zodToJsonSchemaProperty(def.schema);
     }
     if (typeName === 'ZodEnum') {
       return { type: 'string', enum: def.values };
